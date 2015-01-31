@@ -1,0 +1,1111 @@
+= load(
+  visit: rule!qr_TIE_getVisitbyCustomerIdandStatus(
+    rf!CustomerId,
+    {2,9},
+    rf!OutletID
+    ),
+  visitOnly: rule!qr_TIE_getVisitbyCustomerIdandStatus(
+    rf!CustomerId,
+    2,
+    rf!OutletID
+    ),
+  photos: rule!qr_TIE_getBreachPhotosbyCaseId(
+    index(
+      visit.caseId,
+      1,
+      1
+    ),
+    1
+  ),
+  permission: rule!qr_TIE_returnLogPermissionByOutletId(
+    rf!OutletID
+  ),
+  local!display: null,
+  local!docpic: finddocumentsbyname(
+    false,
+    rf!OutletID,
+    cons!CON_TIE_PHOTO_FOLDER
+  ),
+  local!date: null,
+  local!pagingInfo: a!pagingInfo(
+    startIndex: 1,
+    batchSize: if(
+      rule!APN_isEmpty(
+        permission.requestReason
+      ),
+      1,
+      length(
+        {
+          permission.requestReason
+        }
+      )
+    ),
+    sort: {
+      a!sortInfo(
+        field: "permissionDate",
+        ascending: false()
+      )
+    }
+  ),
+  local!visitInfo: a!pagingInfo(
+    startIndex: 1,
+    batchSize: if(
+      rule!APN_isEmpty(
+        visitOnly.caseId
+      ),
+      1,
+      length(
+        {
+          visitOnly.caseId
+        }
+      )
+    ),
+    sort: {
+      a!sortInfo(
+        field: "visitDate",
+        ascending: false()
+      )
+    }
+  ),
+  if(
+    isnull(
+      local!date
+    ),
+    a!formLayout(
+      firstColumnContents: {
+        a!sectionLayout(
+          label: "Outlet Information",
+          firstColumnContents: {
+            if(
+              rule!APN_isEmpty(
+                local!docpic
+              ),
+              a!textField(
+                readOnly: true,
+                value: "No Photo Available"
+              ),
+              {
+                a!imageField(
+                  instructions: "Photo of " & tostring(
+                    rf!OutletName
+                  ),
+                  images: {
+                    a!documentImage(
+                      document: local!docpic,
+                      altText: "Photo of a pub",
+                      caption: "Photo of " & tostring(
+                        rf!OutletName
+                      )
+                    )
+                  },
+                  size: "STANDARD"
+                )
+              }
+            ),
+            a!linkField(
+              links: {
+                a!safeLink(
+                  uri: stripwith(rule!er_TIE_pubmap(
+                    rf!PostCode,
+                    rf!OutletName,
+                    rf!AddressCity
+                  ),"'"),
+                  label: "Click for Map"
+                )
+              }
+            )
+          },
+          secondColumnContents: {
+            a!textField(
+              label: "Customer",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: rf!CustomerId & " - " & rf!CustomerNameCompany
+            ),
+            a!textField(
+              label: "Outlet Address:",
+              labelPosition: "ADJACENT",
+              readOnly: true(),
+              value: if(
+                rule!APN_isEmpty(
+                  rf!OutletAddress2
+                ),
+                rf!OutletAddress1 & "            
+" & rf!OutletCity & ", " & rf!OutletPostCode,
+                rf!OutletAddress1 & "
+" & rf!OutletAddress2 & "
+" & rf!OutletCity & ", " & rf!OutletPostCode
+              )
+            ),
+            a!textField(
+              label: "Customer Address:",
+              labelPosition: "ADJACENT",
+              readOnly: true(),
+              value: if(
+                rule!APN_isEmpty(
+                  rf!AddressLine2
+                ),
+                rf!AddressLine1 & "
+" & rf!AddressCity & ", " & rf!PostCode,
+                rf!AddressLine1 & "
+" & rf!AddressLine2 & "
+" & rf!AddressCity & ", " & rf!PostCode
+              )
+            ),
+            a!textField(
+              label: "Customer Tel:",
+              labelPosition: "ADJACENT",
+              readOnly: true(),
+              value: if(
+                isnull(
+                  rf!TelephoneNo
+                ),
+                "Not Listed",
+                rf!TelephoneNo
+              )
+            ),
+            a!textField(
+              label: "",
+              readOnly: true(),
+              value: ""
+            ),
+            a!textField(
+              label: "Breach Status:",
+              labelPosition: "ADJACENT",
+              readOnly: true(),
+              value: index(
+                visit.status.status,
+                1,
+                "Zero Letters"
+              )
+            ),
+            a!textField(
+              label: "",
+              readOnly: true(),
+              value: ""
+            ),
+            a!textField(
+              label: "Delivery Day:",
+              labelPosition: "ADJACENT",
+              readOnly: true(),
+              value: if(
+                isnull(
+                  rf!DeliveryDay
+                ),
+                "Not Listed",
+                rf!DeliveryDay
+              )
+            ),
+            a!textField(
+              label: "Delivery Time:",
+              labelPosition: "ADJACENT",
+              readOnly: true(),
+              value: if(
+                isnull(
+                  rf!DeliveryWindow
+                ),
+                "Not Listed",
+                rf!DeliveryWindow
+              )
+            )
+          }
+        ),
+        a!sectionLayout(
+          firstColumnContents: {
+            rule!er_TIE_BreachDashboardPhotoDisplay(
+              {
+                photos.documentId
+              }
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Reports",
+          firstColumnContents: {
+            a!checkboxField(
+              disabled: false,
+              choiceLabels: {
+                "Visit Details",
+                "Nil Volumes",
+                "Permissions Log",
+                "Tie & Stockist Type",
+                "Volume Like for Like"
+              },
+              choiceValues: {
+                "Visit Details",
+                "Nil Volumes",
+                "Permissions Log",
+                "Tie & Stockist Type",
+                "Volume Like for Like"
+              },
+              value: local!display,
+              saveInto: local!display
+            )
+          }
+        ),
+        if(
+          isnull(
+            local!display
+          ),
+          {},
+          if(
+            not(
+              contains(
+                local!display,
+                "Visit Details"
+              )
+            ),
+            {},
+            {
+              with(
+                local!datavisit: todatasubset(
+                  visitOnly,
+                  local!visitInfo
+                ).data,
+                a!sectionLayout(
+                  label: "Visit Details",
+                  firstColumnContents: {
+                    a!gridField(
+                      label: "Visit Details",
+                      totalCount: if(rule!APN_isEmpty(visitOnly.caseId),1,length({visitOnly.caseId})),
+                      columns: {
+                        a!gridTextColumn(
+                          label: "Date",
+                          field: "visitDate",
+                          data: {
+                            index(
+                              local!datavisit,
+                              "visitDate",
+                              {}
+                            )
+                          },
+                          links: {
+                            apply(
+                              a!dynamicLink(
+                                label: "test",
+                                value: _,
+                                saveInto: local!date
+                              ),
+                              index(
+                              local!datavisit,
+                              "caseId",
+                              {}
+                            )
+                            )
+                          },
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Visit Type",
+                          field: "breachType",
+                          data: rule!er_TIE_turnBreachTypeToText ({
+                            index(
+                              local!datavisit,
+                              "breachType",
+                              {}
+                            )
+                          }
+                          ),
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Letters",
+                          field: "status.id",
+                          data: if(
+                            rule!APN_isEmpty(
+                              visitOnly.caseId
+                            ),
+                            "None",
+                            apply(
+                              index(
+                                cons!CON_TIE_LETTERS,
+                                _,
+                                "None"
+                              ),
+                              {
+                                local!datavisit.status.id
+                              }
+                            )
+                          ),
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Damages Agreed",
+                          field: "totalDamagesCharge",
+                          data: apply(
+                            rule!er_TIE_pound,
+                            index(
+                              local!datavisit,
+                              "totalDamagesCharge",
+                              {}
+                            )
+                          ),
+                          alignment: "LEFT"
+                        )
+                      },
+                      value: local!visitInfo,
+                      saveInto: local!visitInfo
+                    )
+                  }
+                )
+              )
+            }
+          )
+        ),
+        if(
+          isnull(
+            local!display
+          ),
+          {},
+          if(
+            not(
+              contains(
+                local!display,
+                "Nil Volumes"
+              )
+            ),
+            {},
+            {
+              load(
+                local!nil: rule!qr_TIE_getNilOrdersbyOutlet(
+                  rf!OutletID
+                ),
+                local!nilInfo: a!pagingInfo(
+                  startIndex: 1,
+                  batchSize: if(
+                    rule!APN_isEmpty(
+                      local!nil.volLw1
+                    ),
+                    1,
+                    length(
+                      {
+                        local!nil.volLw1
+                      }
+                    )
+                  ),
+                  sort: {
+                    a!sortInfo(
+                      field: "volLw1",
+                      ascending: false()
+                    )
+                  }
+                ),
+                with(
+                  local!datanil: todatasubset(
+                    local!nil,
+                    local!nilInfo
+                  ).data,
+                  a!sectionLayout(
+                    label: "Nil Volumes (in the latest week)",
+                    firstColumnContents: {
+                      a!gridField(
+                        totalCount: if(
+                          rule!APN_isEmpty(
+                            local!nil.volLw1
+                          ),
+                          1,
+                          length(
+                            {
+                              local!nil.volLw1
+                            }
+                          )
+                        ),
+                        columns: {
+                          a!gridTextColumn(
+                            label: "Week 1",
+                            field: "volLw1",
+                            data: index(
+                              local!datanil,
+                              "volLw1",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Week 2",
+                            field: "volLw2",
+                            data: index(
+                              local!datanil,
+                              "volLw2",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Week 3",
+                            field: "volLw3",
+                            data: index(
+                              local!datanil,
+                              "volLw3",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Week 4",
+                            field: "volLw4",
+                            data: index(
+                              local!datanil,
+                              "volLw4",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          )
+                        },
+                        value: local!nilInfo,
+                        saveInto: local!nilInfo
+                      )
+                    }
+                  )
+                )
+              )
+            }
+          )
+        ),
+        if(
+          isnull(
+            local!display
+          ),
+          {},
+          if(
+            not(
+              contains(
+                local!display,
+                "Permissions Log"
+              )
+            ),
+            {},
+            {
+              with(
+                local!datapermission: todatasubset(
+                  permission,
+                  local!pagingInfo
+                ).data,
+                a!sectionLayout(
+                  label: "Permissions Log",
+                  firstColumnContents: {
+                    a!gridField(
+                      label: "Permissions Log",
+                      totalCount: if(
+                        rule!APN_isEmpty(
+                          permission.requestReason
+                        ),
+                        1,
+                        length(
+                          {
+                            permission.requestReason
+                          }
+                        )
+                      ),
+                      columns: {
+                        a!gridTextColumn(
+                          label: "Date",
+                          field: "permissionDate",
+                          data: index(
+                            local!datapermission,
+                            "permissionDate",
+                            {}
+                          ),
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Outlet ID",
+                          field: "outletId",
+                          data: index(
+                            local!datapermission,
+                            "outletId",
+                            {}
+                          ),
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Outlet Name",
+                          field: "outletName",
+                          data: index(
+                            local!datapermission,
+                            "outletName",
+                            {}
+                          ),
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Customer Name",
+                          field: "customerName",
+                          data: index(
+                            local!datapermission,
+                            "customerName",
+                            {}
+                          ),
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Reason",
+                          field: "requestReason",
+                          data: index(
+                            local!datapermission,
+                            "requestReason",
+                            {}
+                          ),
+                          alignment: "LEFT"
+                        ),
+                        a!gridTextColumn(
+                          label: "Details",
+                          field: "details",
+                          data: index(
+                            local!datapermission,
+                            "details",
+                            {}
+                          ),
+                          alignment: "LEFT"
+                        )
+                      },
+                      value: local!pagingInfo,
+                      saveInto: local!pagingInfo
+                    )
+                  }
+                )
+              )
+            }
+          )
+        ),
+        if(
+          isnull(
+            local!display
+          ),
+          {},
+          if(
+            not(
+              contains(
+                local!display,
+                "Tie & Stockist Type"
+              )
+            ),
+            {},
+            {
+              load(
+                stock: rule!qr_TIE_getStockistbyOutletId(
+                  rf!OutletID
+                ),
+                local!stockInfo: a!pagingInfo(
+                  startIndex: 1,
+                  batchSize: if(
+                    rule!APN_isEmpty(
+                      stock.ProdGrp
+                    ),
+                    1,
+                    length(
+                      stock.ProdGrp
+                    )
+                  ),
+                  sort: {
+                    a!sortInfo(
+                      field: "PTPF",
+                      ascending: false()
+                    )
+                  }
+                ),
+                with(
+                  local!datastock: todatasubset(
+                    stock,
+                    local!stockInfo
+                  ).data,
+                  a!sectionLayout(
+                    label: "Tie & Stockist Type",
+                    firstColumnContents: {
+                      a!gridField(
+                        label: "Tie & Stockist Type",
+                        totalCount: length(
+                          {
+                            stock.ProdGrp
+                          }
+                        ),
+                        columns: {
+                          a!gridTextColumn(
+                            label: "Product",
+                            field: "PTPF",
+                            data: {
+                              index(
+                                local!datastock,
+                                "PTPF",
+                                {}
+                              )
+                            },
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Tie Y/N?",
+                            field: "TiedFlag",
+                            data: {
+                              index(
+                                local!datastock,
+                                "TiedFlag",
+                                {}
+                              )
+                            },
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "L4 Brls",
+                            field: "L4Vol",
+                            data: {
+                              index(
+                                local!datastock,
+                                "L4Vol",
+                                {}
+                              )
+                            },
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Tie Compliance",
+                            field: "StockFlag",
+                            data: {
+                              index(
+                                local!datastock,
+                                "StockFlag",
+                                {}
+                              )
+                            },
+                            alignment: "LEFT"
+                          )
+                        },
+                        value: local!stockInfo,
+                        saveInto: local!stockInfo
+                      )
+                    }
+                  )
+                )
+              )
+            }
+          )
+        ),
+        if(
+          isnull(
+            local!display
+          ),
+          {},
+          if(
+            not(
+              contains(
+                local!display,
+                "Volume Like for Like"
+              )
+            ),
+            {},
+            {
+              load(
+                local!like: rule!qr_TIE_getL4LbyOutlet(
+                  rf!OutletID
+                ),
+                a!sectionLayout(
+                  label: "Volume Like for Like",
+                  firstColumnContents: {
+                    a!columnChartField(
+                      label: "Volumes",
+                      xAxisTitle: "Time Period",
+                      yAxisTitle: "Barrels Sold",
+                      categories: {
+                        "This Week",
+                        "Last 4 Weeks",
+                        "Last 12 Weeks",
+                        "Last Year"
+                      },
+                      series: {
+                        a!chartSeries(
+                          label: "Ale And Lager This Year",
+                          data: {
+                            local!like.TYWKVOL,
+                            local!like.TYPDVOL,
+                            local!like.TYMQVOL,
+                            local!like.TYCUVOL
+                          }
+                        ),
+                        a!chartSeries(
+                          label: "Ale And Lager Last Year",
+                          data: {
+                            local!like.LYWKVOL,
+                            local!like.LYPDVOL,
+                            local!like.LYMQVOL,
+                            local!like.LYCUVOL
+                          }
+                        ),
+                        a!chartSeries(
+                          label: "Cider This Year",
+                          data: {
+                            local!like.TYWKVOLC,
+                            local!like.TYPDVOLC,
+                            local!like.TYMQVOLC,
+                            local!like.TYCUVOLC
+                          }
+                        ),
+                        a!chartSeries(
+                          label: "Cider Last Year",
+                          data: {
+                            local!like.LYWKVOLC,
+                            local!like.LYPDVOLC,
+                            local!like.LYMQVOLC,
+                            local!like.LYCUVOLC
+                          }
+                        )
+                      }
+                    )
+                  }
+                )
+              )
+            }
+          )
+        ),
+        a!sectionLayout(
+          label: "Links",
+          firstColumnContents: {
+            a!linkField(
+              links: {
+                a!safeLink(
+                  uri: "http://dms2.idraught.com/",
+                  label: "Brulines Website"
+                ),
+                a!safeLink(
+                  uri: "http://theintranet/Commercial/beerdispense/Pages/default.aspx",
+                  label: "Damages Calculator (Laptop Only)"
+                )
+              }
+            )
+          },
+          secondColumnContents: {
+            a!linkField(
+              links: {
+                a!safeLink(
+                  uri: stripwith(rule!er_TIE_pubmap(
+                    rf!PostCode,
+                    rf!OutletName,
+                    rf!AddressCity
+                  ),"'"),
+                  label: "Route Planner"
+                ),
+                a!documentDownloadLink(
+                  document: cons!CON_TIE_PUNCH_FINANCIAL_CALENDAR,
+                  label: "Financial Calendar"
+                )
+              }
+            )
+          }
+        )
+      }
+    ),
+    /*Start of Visit Info*/load(
+      visit: rule!getVisitDetailsbyOutletID(
+        rf!OutletID,
+        rf!CustomerId
+      ),
+      local!docpic: finddocumentsbyname(
+        false,
+        rf!OutletID,
+        3731,
+        3730
+      ),
+      local!caseInfo: a!pagingInfo(
+        startIndex: 1,
+        batchSize: 5,
+        sort: {
+          a!sortInfo(
+            field: "refusedEntryOutlet",
+            ascending: false()
+          )
+        }
+      ),
+      local!buyoutInfo: a!pagingInfo(
+        startIndex: 1,
+        batchSize: 5,
+        sort: {
+          a!sortInfo(
+            field: "quantity",
+            ascending: false()
+          )
+        }
+      ),
+      a!formLayout(
+        firstColumnContents: {
+          with(
+            case: rule!getVisitDetailsbyCaseID(
+              local!date
+            ),
+            photos: rule!qr_TIE_getBreachPhotosbyCaseId(
+              local!date,
+              1
+            ),
+            buyout: rule!getBreachBuyoutbycaseId(
+              local!date
+            ),
+            tampering: rule!qr_TIE_getBreachTamperingByCaseId(
+              local!date
+            ),
+            local!datacase: todatasubset(
+              case,
+              local!caseInfo
+            ).data,
+            local!buyoutcase: todatasubset(
+              buyout,
+              local!buyoutInfo
+            ).data,
+            {
+              if(
+                local!date = 0,
+                {},
+                {
+                  a!buttonLayout(
+                    primaryButtons: {
+                      a!buttonWidget(
+                        label: "Back To Summary Dashboard",
+                        style: "PRIMARY",
+                        value: null,
+                        saveInto: local!date
+                      )
+                    }
+                  ),
+                  a!sectionLayout(
+                    label: "Visit Details",
+                    firstColumnContents: {
+                      a!gridField(
+                        label: "Site Information",
+                        totalCount: if(
+                          rule!APN_isEmpty(
+                            case.partnerSignature
+                          ),
+                          1,
+                          length(
+                            case.partnerSignature
+                          )
+                        ),
+                        columns: {
+                          a!gridTextColumn(
+                            label: "Refused Entry Outlet",
+                            field: "refusedEntryOutlet",
+                            data: rule!er_TIE_BooleanYesNo(
+                              index(
+                                local!datacase,
+                                "refusedEntryOutlet",
+                                {}
+                              )
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Refused Entry Cellar",
+                            field: "refusedEntryCellar",
+                            data: rule!er_TIE_BooleanYesNo(
+                              index(
+                                local!datacase,
+                                "refusedEntryCellar",
+                                {}
+                              )
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Person Seen",
+                            field: "personSeen",
+                            data: index(
+                              local!datacase,
+                              "personSeen",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Partner Signature",
+                            field: "partnerSignature",
+                            data: index(
+                              local!datacase,
+                              "partnerSignature",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          )
+                        },
+                        value: local!caseInfo,
+                        saveInto: local!caseInfo
+                      ),
+                      if(
+                        rule!APN_isEmpty(
+                          case.notes
+                        ),
+                        {},
+                        a!paragraphField(
+                          label: "Visit Notes",
+                          labelPosition: "ABOVE",
+                          readOnly: true,
+                          value: index(
+                            case,
+                            "notes",
+                            {}
+                          )
+                        )
+                      )
+                    }
+                  ),
+                  a!sectionLayout(
+                    label: "Breach Type - " & fn!index(
+                      cons!CON_TIE_BREACH_TYPE,
+                      case.breachType,
+                      "None"
+                    ),
+                    firstColumnContents: {
+                      a!gridField(
+                        label: "Buying Out Details",
+                        totalCount: if(
+                          rule!APN_isEmpty(
+                            buyout.category
+                          ),
+                          1,
+                          length(
+                            buyout.category
+                          )
+                        ),
+                        columns: {
+                          a!gridTextColumn(
+                            label: "Quantity",
+                            field: "quantity",
+                            data: index(
+                              local!buyoutcase,
+                              "quantity",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Category",
+                            field: "category",
+                            data: index(
+                              local!buyoutcase,
+                              "category",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Item",
+                            field: "item",
+                            data: index(
+                              local!buyoutcase,
+                              "item",
+                              {}
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Damages Charge",
+                            field: "damagesCharge",
+                            data: if(
+                              rule!APN_isEmpty(
+                                buyout.category
+                              ),
+                              {},
+                              apply(
+                                rule!er_TIE_pound,
+                                index(
+                                  local!buyoutcase,
+                                  "damagesCharge",
+                                  5.50
+                                )
+                              )
+                            ),
+                            alignment: "LEFT"
+                          )
+                        },
+                        value: local!buyoutInfo,
+                        saveInto: local!buyoutInfo
+                      ),
+                      a!gridField(
+                        label: "Charge",
+                        totalCount: 1,
+                        columns: {
+                          a!gridTextColumn(
+                            label: "Total Damages Charge",
+                            data: "£" & index(
+                              case,
+                              "totalDamagesCharge",
+                              199999.00
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Admin Fee",
+                            data: "£" & index(
+                              case,
+                              "adminFee",
+                              25.00
+                            ),
+                            alignment: "LEFT"
+                          )
+                        },
+                        value: a!pagingInfo(
+                          startIndex: 1,
+                          batchSize: 5,
+                          sort: a!sortInfo(
+                            field: "Dispensed",
+                            ascending: true()
+                          )
+                        )
+                      ),
+                      a!gridField(
+                        label: "Tampering",
+                        totalCount: 1,
+                        columns: {
+                          a!gridTextColumn(
+                            label: "Tampering Type",
+                            data: index(
+                              cons!CON_TIE_TAMPERING_TYPE,
+                              tampering.tamperingId,
+                              "No Tampering Detected"
+                            ),
+                            alignment: "LEFT"
+                          ),
+                          a!gridTextColumn(
+                            label: "Details",
+                            data: index(
+                              tampering,
+                              "tamperingDetails",
+                              20
+                            ),
+                            alignment: "LEFT"
+                          )
+                        },
+                        value: a!pagingInfo(
+                          startIndex: 1,
+                          batchSize: 5,
+                          sort: a!sortInfo(
+                            field: "Dispensed",
+                            ascending: true()
+                          )
+                        )
+                      )
+                    }
+                  ),
+                  a!sectionLayout(
+                    label: "Breach Photos Gallery",
+                    firstColumnContents: {
+                      a!imageField(
+                        instructions: "Breach Photos for " & tostring(
+                          rf!OutletName
+                        ),
+                        images: {
+                          apply(
+                            a!documentImage(
+                              document: _
+                            ),
+                            photos.documentId
+                          )
+                        },
+                        size: "THUMBNAIL"
+                      )
+                    }
+                  )
+                }
+              )
+            }
+          )
+        }
+      )
+    )
+  )
+)

@@ -1,0 +1,451 @@
+=load(
+  local!dropdown: null,
+  local!temp,
+  local!breachQuantity: null,
+  local!catrgories: rule!qr_TIE_getCategoryForBrandList(),
+  local!tamperingTypes: rule!qr_TIE_returnTamperingType(),
+  local!breachDamage: null,
+  local!breachItem: null,
+  local!breachtest: 1,
+  local!dropdown2: null,
+  local!breachCategory: null,
+  local!notes: null,
+  local!gridSelection: a!gridSelection(
+    pagingInfo: a!pagingInfo(
+      startIndex: 1,
+      batchSize: 15,
+      sort: {
+        field: "id",
+        ascending: false
+      }
+    ),
+    selected: {}
+  ),
+  a!formLayout(
+    firstColumnContents: {
+      a!sectionLayout(
+        firstColumnContents: {
+          a!milestoneField(
+            steps: {
+              "Site Details",
+              "Contract Breaches",
+              "Upload Evidence"
+            },
+            active: 2
+          )
+        }
+      ),
+      a!sectionLayout(
+        firstColumnContents: {
+          a!textField(
+            label: "Outlet",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: ri!outletDisplayName_Text
+          )
+        }
+      ),
+      a!sectionLayout(
+        label: "New Breach Item",
+        firstColumnContents: {
+          a!dropdownField(
+            label: "Category",
+            labelPosition: "ADJACENT",
+            validations:if(isnull(ri!breachBuyout),null,if(length(ri!breachBuyout)<29,null,"Only 30 breach items can be added at a time")),
+            required: false,
+            requiredMessage: "All Breaches must have a Product Category Selected",
+            choiceLabels: {
+              local!catrgories.category
+            },
+            placeholderLabel: "Please Select a category",
+            choiceValues: {
+              local!catrgories.category
+            },
+            value: local!breachCategory,
+            saveInto: if(
+              isnull(
+                local!breachItem
+              ),
+              local!breachCategory,
+              {
+                local!breachCategory,
+                {
+                  local!breachItem
+                } << rule!er_TIE_becomeNULL(
+                  _
+                )
+              }
+            )
+          ),
+          if(
+            rule!APN_isEmpty(
+              local!breachCategory
+            ),
+            a!dropdownField(
+              label: "Item",
+              labelPosition: "ADJACENT",
+              disabled: true,
+              choiceLabels: {
+                "Please Select a product"
+              },
+              placeholderLabel: "Please Select a product",
+              choiceValues: {
+                "Please Select a product"
+              },
+              value: local!breachItem,
+              saveInto: local!breachItem
+            ),
+            with(
+              local!product: rule!qr_TIE_getBrandListbyCategory(
+                local!breachCategory
+              ),
+              a!dropdownField(
+                label: "Item",
+                labelPosition: "ADJACENT",
+                choiceLabels: index(
+                  {
+                    local!product
+                  },
+                  "BrandDesc",
+                  {}
+                ),
+                placeholderLabel: "Please Select a product",
+                choiceValues: index(
+                  {
+                    local!product
+                  },
+                  "BrandDesc",
+                  {}
+                ),
+                value: local!breachItem,
+                saveInto: local!breachItem
+              )
+            )
+          )
+        },
+        secondColumnContents: {
+          a!integerField(
+            label: "Quantity",
+            labelPosition: "ADJACENT",
+            instructions:rule!er_TIE_categoryInstruct(local!breachCategory),
+            disabled:if(isnull(local!breachCategory),true,false),
+            required: true,
+            value: local!breachQuantity,
+            validationGroup: "Add Item",
+            saveInto: local!breachQuantity
+          ),
+          a!floatingPointField(
+            label: "Damages Charge",
+            labelPosition: "ADJACENT",
+            disabled:if(isnull(local!breachCategory),true,false),
+            instructions:"Please put values in the following format: 00.00",
+            required: true,
+            value: local!breachDamage,
+            validationGroup: "Add Item",
+            saveInto: local!breachDamage
+          ),
+          a!buttonLayout(
+            primaryButtons: {
+              a!buttonWidget(
+          label: "Add Item",
+          style: "NORMAL",
+          disabled:if(
+          rule!APN_isEmpty(local!breachItem),
+          true,
+          if(isnull(ri!breachBuyout),
+          false,
+          if(length(ri!breachBuyout)>29,true,false)
+          )
+          ),
+          validate: true,
+          validationGroup: "Add Item",
+          value: 'type!{urn:appian:types:TIE}cdt_TIE_breachBuyout'(
+              id: null,
+              caseId: ri!breachVisitDetails.caseId,
+              category: local!breachCategory,
+              damagesCharge: local!breachDamage,
+              quantity: local!breachQuantity,
+              item: local!breachItem,
+              sortId: 
+              tointeger(
+                index(
+                {
+                index(
+                  ri!breachBuyout,"sortId",{})},
+                    count({ri!breachBuyout}),0)) + 1
+          ),
+          saveInto: {
+            if(
+            length(index(ri!breachBuyout,"sortId",0)) = 0,
+            ri!breachBuyout,
+            ri!breachBuyout << append(ri!breachBuyout,_)),
+            {local!breachQuantity} << rule!APN_clearArray(_),
+            {local!breachDamage} << rule!APN_clearArray(_)
+          } 
+              )
+            }
+          )
+        }
+      ),
+      with(
+        local!datasubset: todatasubset(
+          fn!reject(
+            fn!isnull(
+              _
+            ),
+            {
+              ri!breachBuyout
+            }
+          ),
+local!gridSelection.pagingInfo
+        ),
+        ri!buyCategory_Text: if(
+          isnull(
+            index(
+              ri!breachBuyout,
+              "category",
+              {}
+            )
+          ),
+          "",
+          index(
+            ri!breachBuyout,
+            "category",
+            {}
+          )
+        ),
+        ri!breachType_Text: rule!er_TIE_tamperingType(
+          ri!cdt_TIE_breachTampering.tamperingId,
+          {
+            ri!buyCategory_Text
+          },
+          ri!breachVisitDetails.refusedEntryCellar,
+          ri!breachVisitDetails.refusedEntryOutlet
+        ),
+        {
+          a!sectionLayout(
+            label: "Buying Out",
+            firstColumnContents: {
+              a!gridField(
+                totalCount: local!datasubset.totalCount,
+                columns: {
+                  a!gridTextColumn(
+                    label: "Quantity",
+                    field: "quantity",
+                    data: index(
+                      local!datasubset.data,
+                      "quantity",
+                      {}
+                    )
+                  ),
+                  a!gridTextColumn(
+                    label: "Item",
+                    field: "item",
+                    data: index(
+                      local!datasubset.data,
+                      "item",
+                      {}
+                    )
+                  ),
+                  a!gridTextColumn(
+                    label: "Category",
+                    field: "category",
+                    data: index(
+                      local!datasubset.data,
+                      "category",
+                      {}
+                    )
+                  ),
+                  a!gridTextColumn(
+                    label: "Damages Charge",
+                    field: "damagesCharge",
+                    data: apply(rule!er_TIE_pound,index(
+                      local!datasubset.data,
+                      "damagesCharge",
+                      {}
+                    )
+                    )
+                  )
+                },
+                identifiers: index(
+                  local!datasubset.data,
+                  "sortId",
+                  {}
+                ),
+                selection: true,
+                value: local!gridSelection,
+                saveInto: {
+                  local!temp << a!returnFirst(
+                    ri!breachVisitDetails.breachType,
+                    _
+                  ),
+                  local!gridSelection
+                }
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              a!textField(
+                label: "Total Damages Charge",
+                labelPosition: "ADJACENT",
+                readOnly: true,
+                value: rule!er_TIE_pound(sum(
+                  {
+                    index(
+                      ri!breachBuyout,
+                      "damagesCharge",
+                      {}
+                    )
+                  }
+                )
+                )
+              ),
+              a!textField(
+                label: "Administrative Fee",
+                labelPosition: "ADJACENT",
+                readOnly: true,
+                value:rule!er_TIE_pound(cons!CON_TIE_ADMINFEE)
+                )
+            },
+            secondColumnContents: {
+              a!textField(
+                label: "Breach Type",
+                labelPosition: "ADJACENT",
+                readOnly: true,
+                value: ri!breachType_Text
+              ),
+              a!buttonLayout(
+                primaryButtons: {
+                  a!buttonWidget(
+                    label: "Remove Selected Item",
+                    style: "NORMAL",
+                    disabled: if(
+                      local!gridSelection.selected = "",
+                      true,
+                      false
+                    ),
+                    value: if(
+                      local!gridSelection.selected = "",
+                      null,
+                      wherecontains(
+                        tointeger(
+                          {
+                            local!gridSelection.selected
+                          }
+                        ),
+                        tointeger(
+                          index(
+                            ri!breachBuyout,
+                            "sortId",
+                            {}
+                          )
+                        )
+                      )
+                    ),
+                    saveInto: {
+                      ri!breachBuyout << remove(
+                        ri!breachBuyout,
+                        _
+                      ),
+                      local!gridSelection.selected << rule!APN_clearArray(
+                        _
+                      ), if(local!gridSelection.pagingInfo.startIndex < 15, {}, if(local!gridSelection.pagingInfo.startIndex > count(ri!breachBuyout),
+                       local!gridSelection.pagingInfo.startIndex << a!returnFirst(local!gridSelection.pagingInfo.startIndex - local!gridSelection.pagingInfo.batchSize,_),{}))
+                    }
+                  )
+                }
+              )
+            }
+          )
+        }
+      ),
+      a!sectionLayout(
+        label: "Tampering",
+        firstColumnContents: {
+          a!dropdownField(
+            label: "Tampering Type",
+            labelPosition: "ADJACENT",
+            choiceLabels: {
+              local!tamperingTypes.tamperingType
+            },
+            placeholderLabel: "Please select a tampering type",
+            choiceValues: {
+              local!tamperingTypes.id
+            },
+            value: ri!cdt_TIE_breachTampering.tamperingId,
+            saveInto: {ri!cdt_TIE_breachTampering.tamperingId, ri!breachType_Text << rule!er_TIE_tamperingType(
+          _,
+          {
+            ri!buyCategory_Text
+          },
+          ri!breachVisitDetails.refusedEntryCellar,
+          ri!breachVisitDetails.refusedEntryOutlet
+        )
+          }
+          ),
+          a!paragraphField(
+            label: "Tampering Notes",
+            labelPosition: "ADJACENT",
+            value: ri!cdt_TIE_breachTampering.tamperingDetails,
+            saveInto: ri!cdt_TIE_breachTampering.tamperingDetails
+          )
+        }
+      ),
+      a!buttonLayout(
+        primaryButtons: {
+          a!buttonWidget(
+            label: "Cancel",
+            style: "NORMAL",
+			confirmMessage: "Are you sure you want to cancel?",
+            submit: true,
+            value: "1",
+            saveInto: ri!cancelButton_Text
+          ),
+          a!buttonWidget(
+            label: "Next",
+            style: "PRIMARY",
+            validate: true,
+            submit: if(
+              and(
+                isnull(
+                  ri!cdt_TIE_breachTampering.tamperingId
+                ),
+                rule!APN_isEmpty(
+                  ri!breachBuyout
+                ),
+                and(
+                  isnull(
+                    ri!breachVisitDetails.refusedEntryOutlet
+                  ),
+                  isnull(
+                    ri!breachVisitDetails.refusedEntryCellar
+                  )
+                )
+              ),
+              false,
+              true
+            ),
+            value: "0",
+            saveInto: {
+              ri!goBackButton_Text,
+              ri!breachVisitDetails.breachType << fn!wherecontains(_,cons!CON_TIE_BREACH_TYPE)<< a!returnFirst(
+                ri!breachType_Text,
+                _
+              )
+            }
+          )
+        },
+        secondaryButtons: {
+          a!buttonWidget(
+            label: "Back",
+            style: "NORMAL",
+            submit: true,
+            value: "1",
+            saveInto: ri!goBackButton_Text
+          )
+        }
+      )
+    }
+  )
+)

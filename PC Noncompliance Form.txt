@@ -1,0 +1,233 @@
+load(
+  local!outletMaster: pv!cdt_PUNCH_pubRecordOutletCustomer,
+  local!certificate: pv!cdt_PC_propertyComplianceDetails,
+  local!files: {},
+  local!fileUploadFolder: pv!caseFolder_folder,
+  local!contractor: pv!cdt_PC_contractor,
+  local!certificateHistory: pv!cdt_PC_certificateHistory,
+  local!certificateType: ri!certificateType,
+  local!certificateTypeArray: ri!certificateTypeArray,
+  local!noncompliancePaging: a!pagingInfo(
+    startIndex: 1,
+    batchSize: - 1,
+    sort: {
+      field: "createdOn",
+      ascending: false
+    }
+  ),
+  with(
+    local!noncomplianceDatasubset: todatasubset(
+      rule!qr_PC_getCommentsByCaseId(
+        ri!caseId
+      ),
+      local!noncompliancePaging
+    ),
+    a!formLayout(
+      label: cons!CON_PC_PROCESS_NAME & ": " & pv!outletName_text & cons!CON_PC_NONCOMPLIANCE_FORM,
+      firstColumnContents: {
+        a!sectionLayout(
+          label: index(
+          local!certificateTypeArray.certificateTypeDesc,
+          wherecontains(
+            local!certificateType.certificateType,
+            local!certificateTypeArray.certificateType
+          )
+        ),
+          firstColumnContents: {
+            a!textField(
+              label: "Outlet ID",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletId
+            ),
+            a!textField(
+              label: "Outlet Name",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletName
+            ),
+            a!textField(
+              label: "Outlet Address",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletAddress1 & " " & local!outletMaster.outletAddress2 & " " & local!outletMaster.outletCity & " " & local!outletMaster.outletPostCode
+            ),
+            a!textField(
+              label: "",
+              readOnly: true,
+              value: ""
+            )
+          },
+          secondColumnContents: {
+            a!textField(
+              label: "Partner Name",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.customerName
+            ),
+            a!textField(
+              label: "Partner Phone",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.customerTelephone
+            ),
+            a!textField(
+              label: "Outlet Phone",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletTelephone
+            ),
+            a!textField(
+              label: "",
+              readOnly: true,
+              value: ""
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Contractor",
+          firstColumnContents: {
+            a!textField(
+              label: "Contractor Name",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!contractor.contractorName
+            ),
+            a!textField(
+              label: "Outlet Number",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletId
+            ),
+            a!textField(
+              label: "Order Type",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!certificate.orderType
+            ),
+            a!textField(
+              label: "Reason for Non-Compliance",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: ri!noncomplianceReason
+            ),
+            a!textField(
+              label: "",
+              readOnly: true,
+              value: ""
+            )
+          },
+          secondColumnContents: {
+            a!textField(
+              label: "Contractor Contact",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!contractor.telMobile
+            ),
+            a!textField(
+              label: "Outlet Name",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletName
+            ),
+            a!textField(
+              label: "Partner Name",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.customerName
+            ),
+            a!dateField(
+              label: "Query Date",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: ri!noncomplianceDate
+            ),
+            a!textField(
+              label: "",
+              readOnly: true,
+              value: ""
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Explanation of Non-Compliance",
+          firstColumnContents: {
+            a!paragraphField(
+              label: "Comments",
+              labelPosition: "ABOVE",
+              instructions: "List reasons for non-compliance here",
+              value: ri!propertySupportComments,
+              saveInto: ri!propertySupportComments
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Non-Compliance History",
+          firstColumnContents: {
+            a!gridField(
+              label: "",
+              totalCount: if(
+                rule!APN_isEmpty(
+                  local!noncomplianceDatasubset.data
+                ),
+                1,
+                local!noncomplianceDatasubset.totalCount
+              ),
+              columns: {
+                a!gridTextColumn(
+                  label: "Reason for Non-Compliance",
+                  field: "noncomplianceReason",
+                  data: local!noncomplianceDatasubset.data.noncomplianceReason,
+                  alignment: "LEFT"
+                ),
+                a!gridTextColumn(
+                  label: "Date",
+                  field: "createdOn",
+                  data: datetext(
+                    local!noncomplianceDatasubset.data.createdOn,
+                    "dd/MM/yyyy"
+                  ),
+                  alignment: "LEFT"
+                ),
+                a!gridTextColumn(
+                  label: "Comments",
+                  field: "comment",
+                  data: local!noncomplianceDatasubset.data.comment,
+                  alignment: "LEFT"
+                ),
+                a!gridTextColumn(
+                  label: "Entered By",
+                  field: "createdBy",
+                  data: local!noncomplianceDatasubset.data.createdBy,
+                  alignment: "LEFT"
+                )
+              },
+              value: local!noncompliancePaging,
+              saveInto: local!noncompliancePaging
+            )
+          }
+        ),
+        a!buttonLayout(
+          primaryButtons: {
+            a!buttonWidget(
+              label: "Exempt",
+              style: "NORMAL",
+              submit: true,
+              validate: true,
+              value: "2",
+              saveInto: ri!noncomplianceButton
+            ),
+            a!buttonWidget(
+              label: "Submit",
+              style: "PRIMARY",
+              submit: true,
+              validate: true,
+              value: "1",
+              saveInto: ri!noncomplianceButton
+            )
+          }
+        )
+      }
+    )
+  )
+)

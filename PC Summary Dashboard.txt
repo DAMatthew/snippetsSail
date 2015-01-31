@@ -1,0 +1,371 @@
+load(
+  local!pagingInfoStatus: a!pagingInfo(
+    startIndex: 1,
+    batchSize: 10,
+    sort: a!sortInfo(
+      field: "certificateType",
+      ascending: true()
+    )
+  ),
+  local!pagingInfoRequests: a!pagingInfo(
+    startIndex: 1,
+    batchSize: 5,
+    sort: a!sortInfo(
+      field: "contractorRequestDate",
+      ascending: false
+    )
+  ),
+  local!pagingInfoHistory: a!pagingInfo(
+      startIndex: 1,
+      batchSize: 10,
+      sort: {
+        a!sortInfo(field: "certDesc", ascending: true),
+        a!sortInfo(field: "certificateExpiryDate", ascending: false)
+      }
+  ),
+  local!pagingInfoDefaultContractor: a!pagingInfo(
+    startIndex: 1,
+    batchSize: 8,
+    sort: a!sortInfo(
+      field: "certificateDescription",
+      ascending: true
+    )
+  ),
+  local!pagingInfoComments: a!pagingInfo(
+    startIndex: 1,
+    batchSize: 10
+  ),
+
+  compliantCertificates: rule!qr_PC_getCertificatesByComplianceType({
+    cons!CON_PC_COMPLIANCE_TYPE_KS,
+    cons!CON_PC_COMPLIANCE_TYPE_R4BCERTIFICATEONLY
+  }),
+  activeCertificates: rule!qr_PC_getActiveCertificatesById(
+    ri!outletId,
+    cons!CON_PC_CERTIFICATE_STATUS_ACTIVE
+  ),
+  complianceData: index(activeCertificates, wherecontains(compliantCertificates.certificateType, activeCertificates.certificateType),
+    {}
+  ),
+  
+  certificateHistory: rule!qr_PC_vw_getCertHistoryByOutlet_recent(ri!outletId),
+  
+  defaultContractor: rule!qr_PC_vw_getDefaultContractorByOutlet(ri!outletId),
+  
+  comments: rule!qr_PC_getCasesByOutletOnly(ri!outletId),
+  commentsData: rule!qr_PC_getCommentsByCaseId(comments.caseId),
+
+  
+  with(
+    local!complianceStatus: todatasubset(
+      complianceData,
+      local!pagingInfoStatus
+    ),
+    local!requestedCertificatesDS: rule!er_PC_QEntity_getCertificatesByOutletAndStatus(
+      ri!outletId,
+      cons!CON_PC_CERTIFICATE_STATUS_REQUESTED,
+      local!pagingInfoRequests
+    ),
+    local!certificateHistoryDS: todatasubset(
+      certificateHistory,
+      local!pagingInfoHistory
+    ),    
+    local!defaultContractorDS: todatasubset(
+      defaultContractor,
+      local!pagingInfoDefaultContractor
+    ),
+    
+    local!commentsDS: todatasubset(
+      commentsData,
+      local!pagingInfoComments
+    ),
+    
+/*  The following intentionally do not use queryEntity because of inability of QE to correctly pass through indexed variables:
+/*    complianceStatus (including rule!er_PC_checkExemption > qr_PC_getCertExemptionsByOutletAndCertType)
+/*    commentsDS 
+
+/*  Data integrity problem with Certificate Comments table:
+/*    For every caseId that's in the cdt_PC_propertyComplianceDetails table,
+/*    there is NOT also a caseId to match in the cdt_PC_comments table.  */
+
+    a!dashboardLayout(
+      firstColumnContents: {
+        a!sectionLayout(
+          label: "Compliance Status",
+          firstColumnContents: {
+/*            a!textField(
+              label: "TEST Is Failed?",
+              readOnly: true(),
+              value: a!applyComponents(
+                function: rule!er_PC_checkWarningFailed,
+                array: merge(
+                  {index(local!complianceStatus.data, "certificateType", {})},
+                  {index(local!complianceStatus.data, "certificateWarning", {})}
+                )
+              )
+            ), */
+            a!gridField(
+              instructions: "A certificate may not be compliant for one of the following reasons; it has expired, it is due to expire in " &cons!CON_PC_COMPLIANCE_EXPIRY_MONTH_COP &" months (CoP) or " &cons!CON_PC_COMPLIANCE_EXPIRY_MONTH_KS &" month (KS), we do not hold a certificate historically, or the certificate has a Failed warning type (e.g. At Risk, Dangerous, etc.)",
+              totalCount: local!complianceStatus.totalCount,
+              columns: {
+                a!gridTextColumn(
+                  label: "Certificate Description",
+                  field: "certificateType",
+                  data: if(local!complianceStatus.totalCount = 0, {},
+                    a!applyComponents(
+                      function: rule!er_PC_getCertificateDescription,
+                      array: index(local!complianceStatus.data, "certificateType", {})
+                      )
+                    ),
+                  alignment: "LEFT"
+                ),
+                a!gridTextColumn(
+                  label: "CoP Compliant",
+                  field: "copCompliant",
+                  alignment: "LEFT",
+                  data: if(local!complianceStatus.totalCount = 0, {},
+                    a!applyComponents(
+                      function: rule!er_PC_checkCOPcompliance,
+                      array: merge(    
+                        {index(local!complianceStatus.data, "certificateType", {})},
+                        {index(local!complianceStatus.data, "certificateExpiryDate", {})},
+                        {a!applyComponents(
+                          function: rule!er_PC_checkExemption,
+                          array: merge(
+                            {repeat(length(index(local!complianceStatus.data, "certificateType", {})) , ri!outletId)},
+                            {index(local!complianceStatus.data, "certificateType", {})}
+                          )
+                        )
+                        },
+                        {a!applyComponents(
+                          function: rule!er_PC_checkWarningFailed,
+                          array: merge(
+                            {index(local!complianceStatus.data, "certificateType", {})},
+                            {index(local!complianceStatus.data, "certificateWarning", {})}
+                          )
+                        )
+                        }
+                      )
+                    )
+                  )
+                ),
+                a!gridTextColumn(
+                  label: "KS Compliant",
+                  field: "ksCompliant",
+                  alignment: "LEFT",
+                  data: if(local!complianceStatus.totalCount = 0, {},
+                    a!applyComponents(
+                      function: rule!er_PC_checkKScompliance,
+                      array: merge(
+                        {index(local!complianceStatus.data, "certificateType", {})},
+                        {index(local!complianceStatus.data, "certificateExpiryDate", {})},
+                        {a!applyComponents(
+                          function: rule!er_PC_checkExemption,
+                          array: merge(
+                            {repeat(length(index(local!complianceStatus.data, "certificateType", {})) , ri!outletId)},
+                            {index(local!complianceStatus.data, "certificateType", {})}
+                          )
+                        )},
+                        {a!applyComponents(
+                          function: rule!er_PC_checkSafeToUseActive,
+                          array: repeat(length(index(local!complianceStatus.data, "certificateType", {})) , ri!outletId)
+                        )},
+                        {a!applyComponents(
+                          function: rule!er_PC_checkWarningFailed,
+                          array: merge(
+                            {index(local!complianceStatus.data, "certificateType", {})},
+                            {index(local!complianceStatus.data, "certificateWarning", {})}
+                          )
+                        )
+                        }
+                      )
+                    )
+                  )
+                )
+              },
+              value: local!pagingInfoStatus,
+              saveInto: local!pagingInfoStatus
+            )
+          }
+        ),        
+        a!sectionLayout(
+          label: "Requested Certificates",                                    
+          firstColumnContents: {
+            a!gridField(
+              totalCount: local!requestedCertificatesDS.totalCount,
+              columns: {
+                a!gridTextColumn(
+                  label: "Certificate Description",
+                  field: "certificateType",
+                  data: if(local!requestedCertificatesDS.totalCount = 0, {},
+                    a!applyComponents(
+                      function: rule!er_PC_getCertificateDescription,
+                      array: index(local!requestedCertificatesDS.data, "certificateType", {})
+                    )
+                  ),
+                  alignment: "LEFT"
+                ),
+                a!gridTextColumn(
+                  label: "Contractor",
+                  field: "contractorNumber",
+                  data: if(local!requestedCertificatesDS.totalCount = 0,  {},
+                      a!applyComponents(
+                        function: rule!er_PC_QEntity_getContractorName,
+                        array: local!requestedCertificatesDS.data["contractorNumber"]
+                      )
+                  )
+                ),
+                a!gridTextColumn(
+                  label: "Requested Date",
+                  field: "contractorRequestDate",
+                  data: { index(local!requestedCertificatesDS.data, "contractorRequestDate", {}) }
+                ),
+                a!gridTextColumn(
+                  label: "Order Type",
+                  field: "orderType",
+                  data: index(local!requestedCertificatesDS.data, "orderType", {})
+                ),
+                a!gridTextColumn(
+                  label: "Status",
+                  field: "certificateStatus",
+                  data: index(local!requestedCertificatesDS.data, "certificateStatus", {})
+                )
+              },
+              value: local!pagingInfoRequests,
+              saveInto: local!pagingInfoRequests
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Certificate History",
+          firstColumnContents: {
+            a!gridField(
+              totalCount: local!certificateHistoryDS.totalCount,
+              columns: {
+                a!gridTextColumn(
+                  label: "Certificate Description",
+                  field: "certDesc",  
+                  data: index(local!certificateHistoryDS.data, "certDesc", {})
+                ),
+                a!gridTextColumn(
+                  label: "Status",
+                  field: "certificateStatus",
+                  data: index(local!certificateHistoryDS.data, "certificateStatus", {})
+                ),
+                a!gridTextColumn(
+                  label: "Certificate Expiry",
+                  field: "certificateExpiryDate",
+                  data: index(local!certificateHistoryDS.data, "certificateExpiryDate", {})
+                )         /*,           certificateWaring FIELD NOT PRESENT IN NEW PUNCH-BASED VIEW
+                a!gridTextColumn(
+                  label: "Warning",
+                  field: "certificateWarning",
+                  data: if(local!certificateHistoryDS.totalCount = 0, {},
+                    a!applyComponents(
+                      function: rule!er_PC_returnNAifNull,
+                      array: local!certificateHistoryDS.data["certificateWarning"]
+                    )
+                  )
+                ) */
+              },
+              value: local!pagingInfoHistory,
+              saveInto: local!pagingInfoHistory
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Default Contractor Details",
+          firstColumnContents: {
+            a!gridField(
+              totalCount: local!defaultContractorDS.totalCount,
+              columns: {
+                a!gridTextColumn(
+                  label: "Certificate Description",
+                  field: "certificateDescription",
+                  data: index(local!defaultContractorDS.data, "certificateDescription", {})
+                ),
+                a!gridTextColumn(
+                  label: "Contractor Name",
+                  field: "contractorName",
+                  data: index(local!defaultContractorDS.data, "contractorName", {})
+                ),
+                a!gridTextColumn(
+                  label: "Contractor City",
+                  field: "contractorAddress3",
+                  data: index(local!defaultContractorDS.data, "contractorAddress3", {})
+                ),
+                a!gridTextColumn(
+                  label: "Contractor Landline Number",
+                  field: "telLandline",
+                  data: index(local!defaultContractorDS.data, "telLandline", {})
+                ),
+                a!gridTextColumn(
+                  label: "Contractor Mobile Number",
+                  field: "telMobile",
+                  data: index(local!defaultContractorDS.data, "telMobile", {})
+                )
+              },
+              value: local!pagingInfoDefaultContractor,
+              saveInto: local!pagingInfoDefaultContractor
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Certificate Comments",
+          firstColumnContents: {
+            a!gridField(
+              totalCount: local!commentsDS.totalCount,
+              columns: {
+                a!gridTextColumn(
+                  label: "Comment Type",
+                  field: "commentTypeId",
+                  data: if(local!commentsDS.totalCount = 0, {},
+                    a!applyComponents(
+                      function: rule!er_PC_QEntity_getCommentType,
+                      array: local!commentsDS.data["commentTypeId"]
+                    )
+                  )
+                ),
+               a!gridTextColumn(
+                  label: "Reason",
+                  field: "noncomplianceReason",
+                  data: if(local!commentsDS.totalCount = 0, {},
+                    a!applyComponents(
+                      function: rule!er_PC_returnNAifNull,
+                      array: local!commentsDS.data["noncomplianceReason"]
+                    )
+                  )
+               ),
+                a!gridTextColumn(
+                  label: "Comment",
+                  field: "comment",
+                  data: index(local!commentsDS.data, "comment", {})
+                ),
+                a!gridTextColumn(
+                  label: "Comment Date",
+                  field: "createdOn",
+                  data: text(
+                    index(local!commentsDS.data, "createdOn", {}),
+                    "dd/mm/yyyy hh:mm:ss"
+                  )
+                ),
+                a!gridTextColumn(
+                  label: "Entered by",
+                  field: "createdBy",
+                  data: if(local!commentsDS.totalCount = 0, {},
+                    apply(
+                      rule!APN_displayUser,
+                      local!commentsDS.data["createdBy"]
+                    )
+                  )
+                )
+              },
+              value: local!pagingInfoComments,
+              saveInto: local!pagingInfoComments
+            )   
+          }
+        )
+      }
+    )
+  )
+)

@@ -1,0 +1,127 @@
+=load(
+    local!dropdown:null,
+    a!formLayout(
+firstColumnContents:{
+    a!sectionLayout(
+        firstColumnContents:{
+        a!milestoneField(
+            steps:{"Site Details","Contract Breaches","Upload Evidence"},
+            active:1
+            )
+    }
+        ),
+    a!sectionLayout(
+        label:"Visit Details",
+        firstColumnContents:{
+            a!dateField(
+                label:"Visit Date",
+                required:true,
+                value:ri!breachVisitDetails.visitDate,
+                saveInto:ri!breachVisitDetails.visitDate
+                ),
+            a!textField(
+                label:"Outlet ID",
+                readOnly:true,
+                value:ri!breachVisitDetails.outletID
+                ),
+            a!textField(
+            label:"Customer Number",
+            readOnly:true,
+            value:ri!breachVisitDetails.customerId,
+            saveInto:ri!breachVisitDetails.customerId
+            ),
+         a!textField(
+            label:"Person Seen",
+            readOnly:false,
+            value:ri!breachVisitDetails.personSeen,
+            saveInto:ri!breachVisitDetails.personSeen
+            ),
+         a!dropdownField(
+            label:"Partner Signature",
+            placeholderLabel:"Please select an option",
+            required:true,
+            choiceLabels:{cons!CON_TIE_PARTNER_SIG_OPTIONS},
+            choiceValues:{cons!CON_TIE_PARTNER_SIG_OPTIONS},
+            value:ri!breachVisitDetails.partnerSignature,
+            saveInto:ri!breachVisitDetails.partnerSignature
+            )
+},
+secondColumnContents:{
+    /*Blank text field is used to add a space to the left side column*/
+        a!textField(
+            label:"",
+            value:"",
+            readOnly:true
+            ),
+        a!textField(
+            label:"Outlet Name",
+            value:ri!breachVisitDetails.outletName,
+            readOnly:true,
+            saveInto:ri!breachVisitDetails.outletName
+            ),
+        a!textField(
+            label:"Customer Name",
+            value:ri!breachVisitDetails.customerName,
+            readOnly:true,
+            saveInto:ri!breachVisitDetails.customerName
+            ),
+         a!checkboxField(
+            label:"Refused Entry",
+            choiceLabels:{"Outlet","Cellar"},
+            choiceValues:{"Outlet","Cellar"},
+            value:if(and(ri!breachVisitDetails.refusedEntryOutlet=true,ri!breachVisitDetails.refusedEntryCellar=true),{"Outlet","Cellar"},
+                if(ri!breachVisitDetails.refusedEntryOutlet=true,{"Outlet"},
+                    if(ri!breachVisitDetails.refusedEntryCellar=true,{"Cellar"},null))
+                ),
+            saveInto:{ri!breachVisitDetails.refusedEntryOutlet<<contains(_,"Outlet"),
+                        ri!breachVisitDetails.refusedEntryCellar<< contains(_, "Cellar")}
+            ),
+         if(ri!breachVisitDetails.partnerSignature="Signed",
+          a!dateField(
+            label:"Signature Date",
+            required:true,
+            value:ri!breachVisitDetails.signatureDate,
+            saveInto:ri!breachVisitDetails.signatureDate
+                ),
+          {}
+          )
+}
+            ),
+a!sectionLayout(
+    label:"Notes",
+    firstColumnContents:{
+        a!paragraphField(
+            label:"Please add any additional details",
+            value:ri!breachVisitDetails.notes,
+            saveInto:ri!breachVisitDetails.notes,
+            labelPosition:"ABOVE"
+            )
+        }
+        ),
+    a!buttonLayout(
+        primaryButtons:{
+        a!buttonWidget(
+            label:"Cancel",
+            style:"NORMAL",
+            submit:true,
+            validate:false,
+            value:"1",
+            saveInto:ri!cancelButton_Text
+            ),
+        a!buttonWidget(
+            label:"Next",
+            style:"PRIMARY",
+            confirmMessage:if(ri!breachVisitDetails.partnerSignature="Not Offered - Partner not available",
+                "ALERT: The Partner must be offered a chance to sign the form. Do you wish to continue?   -PDM Will be Notified",
+                if(ri!breachVisitDetails.partnerSignature="Not Signed - Refused","Photographic evidence must be provided when signature is refused to submit breach. Do you wish to continue?",
+                    null)
+                ),
+            submit:true
+            )
+    }
+        )
+}
+)
+)
+
+

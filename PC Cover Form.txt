@@ -1,0 +1,631 @@
+= load(
+  local!outletMaster: pv!cdt_PUNCH_pubRecordOutletCustomer,
+  local!certificate: pv!cdt_PC_propertyComplianceDetails,
+  local!certificateType: ri!certificateType,
+  local!certificateTypeArray: ri!certificateTypeArray,
+  local!certificateFolder: pv!certificate_folder,
+  local!quoteFolder: pv!quote_folder,
+  local!contractor: pv!cdt_PC_contractor,
+  local!noncomplianceReason: {},
+  local!rules,
+  local!pagingInfo: a!pagingInfo(
+    startIndex: 1,
+    batchSize: - 1,
+    sort: {
+      field: "certificateExpiryDate",
+      ascending: false
+    }
+  ),
+  local!noncompliancePaging: a!pagingInfo(
+    startIndex: 1,
+    batchSize: - 1,
+    sort: {
+      field: "createdOn",
+      ascending: false
+    }
+  ),
+  with(
+    local!datasubset: todatasubset(
+      rule!qr_PC_getCertificateHistoryByOutletType(
+        ri!outletId,
+        local!certificateType.certificateType,
+        edate(
+          today(),
+          - 12
+        )
+      ),
+      local!pagingInfo
+    ),
+    local!noncomplianceDatasubset: todatasubset(
+      rule!qr_PC_getCommentsByCaseId(
+        ri!caseId
+      ),
+      local!noncompliancePaging
+    ),
+    a!formLayout(
+      label: cons!CON_PC_PROCESS_NAME & ": " & pv!outletName_text & " - Cover Form",
+      firstColumnContents: {
+        a!sectionLayout(
+          label: index(
+            local!certificateTypeArray.certificateTypeDesc,
+            wherecontains(
+              local!certificateType.certificateType,
+              local!certificateTypeArray.certificateType
+            )
+          ),
+          firstColumnContents: {
+            a!textField(
+              label: "Outlet ID",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletId
+            ),
+            a!textField(
+              label: "Outlet Name",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletName
+            ),
+            a!textField(
+              label: "Outlet Address",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletAddress1 & " " & local!outletMaster.outletAddress2 & " " & local!outletMaster.outletCity & " " & local!outletMaster.outletPostCode
+            ),
+            a!textField(
+              label: "",
+              readOnly: true,
+              value: ""
+            )
+          },
+          secondColumnContents: {
+            a!textField(
+              label: "Partner Name",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.customerName
+            ),
+            a!textField(
+              label: "Partner Phone",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.customerTelephone
+            ),
+            a!textField(
+              label: "Outlet Phone",
+              labelPosition: "ADJACENT",
+              readOnly: true,
+              value: local!outletMaster.outletTelephone
+            ),
+            a!textField(
+              label: "",
+              readOnly: true,
+              value: ""
+            )
+          }
+        ),
+        if(
+          rule!APN_isEmpty(
+            local!datasubset.data
+          ),
+          {},
+          {
+            a!sectionLayout(
+              label: "Certificate History",
+              firstColumnContents: {
+                a!gridField(
+                  label: "",
+                  totalCount: local!datasubset.totalCount,
+                  columns: {
+                    a!gridTextColumn(
+                      label: "Certificate Type",
+                      field: "certificateType",
+                      data: index(
+                        {
+                          local!certificateTypeArray.certificateTypeDesc
+                        },
+                        apply(
+                          wherecontains(
+                            _,
+                            {
+                              local!certificateTypeArray.certificateType
+                            }
+                          ),
+                          {
+                            local!datasubset.data.certificateType
+                          }
+                        )
+                      ),
+                      alignment: "LEFT"
+                    ),
+                    a!gridTextColumn(
+                      label: "Expiry Date",
+                      field: "certificateExpiryDate",
+                      data: local!datasubset.data.certificateExpiryDate,
+                      alignment: "LEFT"
+                    )
+                  },
+                  value: local!pagingInfo,
+                  saveInto: local!pagingInfo
+                )
+              }
+            )
+          }
+        ),
+        if(
+          or(
+            ri!secondTime = false,
+            isnull(
+              ri!secondTime
+            ),
+            rule!APN_isEmpty(
+              ri!secondTime
+            )
+          ),
+          {
+            a!sectionLayout(
+              label: "Compliance",
+              firstColumnContents: {
+                a!radioButtonField(
+                  label: "Are you uploading a certificate?",
+                  labelPosition: "ABOVE",
+                  instructions: "Selecting 'No' will direct you to the Non-Compliance Form to complete.",
+                  required: true,
+                  choiceLabels: cons!CON_PC_YES_NO,
+                  choiceValues: cons!CON_PC_YES_NO,
+                  value: ri!compliant,
+                  saveInto: ri!compliant
+                ),
+                a!textField(
+                  label: "",
+                  readOnly: true,
+                  value: ""
+                )
+              }
+            )
+          },
+          {}
+        ),
+        if(
+          and(
+            ri!compliant = null,
+            or(
+              ri!secondTime = false,
+              isnull(
+                ri!secondTime
+              ),
+              rule!APN_isEmpty(
+                ri!secondTime
+              )
+            )
+          ),
+          a!buttonLayout(
+            primaryButtons: {
+              a!buttonWidget(
+                label: "Submit",
+                style: "PRIMARY",
+                submit: true
+              )
+            }
+          ),
+          if(
+            or(
+              ri!compliant = "Yes",
+              ri!secondTime = True
+            ),
+            {
+              a!sectionLayout(
+                label: "Certificate Details",
+                firstColumnContents: {
+                  a!dateField(
+                    label: "Date Requested",
+                    labelPosition: "ADJACENT",
+                    readOnly: true,
+                    value: local!certificate.contractorRequestDate
+                  ),
+                  a!textField(
+                    label: "Order Type",
+                    labelPosition: "ADJACENT",
+                    readOnly: true,
+                    value: local!certificate.orderType
+                  ),
+                  a!textField(
+                    label: "Certificate Type",
+                    labelPosition: "ADJACENT",
+                    readOnly: true,
+                    value: index(
+                      local!certificateTypeArray.certificateTypeDesc,
+                      wherecontains(
+                        local!certificateType.certificateType,
+                        local!certificateTypeArray.certificateType
+                      )
+                    )
+                  ),
+                  a!dateField(
+                    label: "Certificate Effective From",
+                    labelPosition: "ADJACENT",
+                    required: true,
+                    value: ri!certificateDate,
+                    saveInto: ri!certificateDate
+                  )
+                },
+                secondColumnContents: {
+                  a!dateField(
+                    label: "Date Due",
+                    labelPosition: "ADJACENT",
+                    readOnly: true,
+                    value: if(
+                      rule!APN_isEmpty(
+                        local!certificate.contractorRequestDate
+                      ),
+                      {},
+                      {
+                        local!certificate.contractorRequestDate + (
+                          11 + (
+                            11 - (
+                              calworkdays(
+                                local!certificate.contractorRequestDate,
+                                local!certificate.contractorRequestDate + 11
+                              )
+                            )
+                          )
+                        )
+                      }
+                    )
+                  ),
+                  a!dateField(
+                    label: "Date Uploaded",
+                    labelPosition: "ADJACENT",
+                    readOnly: true,
+                    value: ri!dateUpload
+                  ),
+                  a!dropdownField(
+                    label: "Warning",
+                    labelPosition: "ADJACENT",
+                    required: true,
+                    choiceLabels: if(
+                      or(
+                        local!certificateType.certificateType = 2,
+                        local!certificateType.certificateType = 7,
+                        local!certificateType.certificateType = 6,
+                        local!certificateType.certificateType = 8
+                      ),
+                      cons!CON_PC_BASIC_WARNING_TYPES,
+                      if(
+                        or(
+                          local!certificateType.certificateType = 1,
+                          local!certificateType.certificateType = 5
+                        ),
+                        cons!CON_PC_GAS_WARNING_TYPES,
+                        if(
+                          local!certificateType.certificateType = 13,
+                          cons!CON_PC_FRA_WARNING_TYPES,
+                          if(
+                            or(
+                              local!certificateType.certificateType = 4,
+                              local!certificateType.certificateType = 9,
+                              local!certificateType.certificateType = 10,
+                              local!certificateType.certificateType = 21
+                            ),
+                            cons!CON_PC_GROUND_WARNING_TYPES,
+                            if(
+                              local!certificateType.certificateType = 11,
+                              cons!CON_PC_WARNINGS_11,
+                              if(
+                                local!certificateType.certificateType = 3,
+                                cons!CON_PC_ASBESTOS_WARNINGS,
+                                1
+                              )
+                            )
+                          )
+                        )
+                      )
+                    ),
+                    placeHolderLabel: cons!CON_PC_DROPDOWN,
+                    choiceValues: if(
+                      or(
+                        local!certificateType.certificateType = 2,
+                        local!certificateType.certificateType = 7,
+                        local!certificateType.certificateType = 6,
+                        local!certificateType.certificateType = 8
+                      ),
+                      cons!CON_PC_BASIC_WARNING_TYPES,
+                      if(
+                        or(
+                          local!certificateType.certificateType = 1,
+                          local!certificateType.certificateType = 5
+                        ),
+                        cons!CON_PC_GAS_WARNING_TYPES,
+                        if(
+                          local!certificateType.certificateType = 13,
+                          cons!CON_PC_FRA_WARNING_TYPES,
+                          if(
+                            or(
+                              local!certificateType.certificateType = 4,
+                              local!certificateType.certificateType = 9,
+                              local!certificateType.certificateType = 10,
+                              local!certificateType.certificateType = 21
+                            ),
+                            cons!CON_PC_GROUND_WARNING_TYPES,
+                            if(
+                              local!certificateType.certificateType = 11,
+                              cons!CON_PC_WARNINGS_11,
+                              if(
+                                local!certificateType.certificateType = 3,
+                                cons!CON_PC_ASBESTOS_WARNINGS,
+                                1
+                              )
+                            )
+                          )
+                        )
+                      )
+                    ),
+                    value: ri!selection,
+                    saveInto: {
+                      {
+                        local!rules,
+                        ri!documentArray << rule!er_PC_repeatValue(
+                          _
+                        )
+                      } << rule!qr_PC_getRules(
+                        local!certificateType.certificateType,
+                        _
+                      ),
+                      ri!selection
+                    }
+                  ),
+                  a!dateField(
+                    label: "Certificate Expiry Date",
+                    labelPosition: "ADJACENT",
+                    readOnly: if(
+                      and(
+                        not(
+                          rule!APN_isEmpty(
+                            local!rules.warningDescFail
+                          )
+                        ),
+                        local!rules.warningDescFail = 1
+                      ),
+                      true,
+                      false
+                    ),
+                    required: if(
+                      and(
+                        not(
+                          rule!APN_isEmpty(
+                            local!rules.warningDescFail
+                          )
+                        ),
+                        local!rules.warningDescFail = 1
+                      ),
+                      false,
+                      true
+                    ),
+                    value: if(
+                      and(
+                        not(
+                          rule!APN_isEmpty(
+                            local!rules.warningDescFail
+                          )
+                        ),
+                        local!rules.warningDescFail = 1
+                      ),
+                      ri!certificateDate + 182,
+                      ri!certificateExpiry
+                    ),
+                    saveInto: ri!certificateExpiry
+                  )
+                }
+              ),
+              a!sectionLayout(
+                firstColumnContents: {
+                  a!paragraphField(
+                    label: "Comments",
+                    labelPosition: "ABOVE",
+                    value: ri!commentField,
+                    saveInto: ri!commentField
+                  )
+                }
+              ),
+              if(
+                or(
+                  isnull(
+                    ri!selection
+                  ),
+                  rule!APN_isEmpty(
+                    ri!selection
+                  )
+                ),
+                {},
+                {
+                  a!sectionLayout(
+                    label: "Documents",
+                    firstColumnContents: {
+                      a!applyComponents(
+                        function: rule!er_PC_documentHelper(
+                          document: ri!document,
+                          rule: local!rules,
+                          array: ri!documentArray,
+                          index: _,
+                          folder: ri!caseFolder
+                        ),
+                        array: enumerate(
+                          length(
+                            {
+                              local!rules
+                            }
+                          )
+                        ) + 1
+                      ),
+                      a!textField(
+                        label: "",
+                        readOnly: true,
+                        value: "Please upload the Certificate in PDF file format."
+                      )
+                    }
+                  )
+                }
+              ),
+              a!buttonLayout(
+                primaryButtons: {
+                  a!buttonWidget(
+                    label: "Submit",
+                    style: "PRIMARY",
+                    submit: true
+                  )
+                }
+              )
+            },
+            if(
+              ri!compliant = "No",
+              {
+                if(
+                  or(
+                    ri!secondTime = false,
+                    isnull(
+                      ri!secondTime
+                    ),
+                    rule!APN_isEmpty(
+                      ri!secondTime
+                    )
+                  ),
+                  {
+                    a!sectionLayout(
+                      label: "Contractor",
+                      firstColumnContents: {
+                        a!textField(
+                          label: "Contractor Name",
+                          labelPosition: "ADJACENT",
+                          readOnly: true,
+                          value: local!contractor.contractorName
+                        ),
+                        a!textField(
+                          label: "Outlet Number",
+                          labelPosition: "ADJACENT",
+                          readOnly: true,
+                          value: local!outletMaster.outletId
+                        ),
+                        a!textField(
+                          label: "Order Type",
+                          labelPosition: "ADJACENT",
+                          readOnly: true,
+                          value: local!certificate.orderType
+                        ),
+                        a!dropdownField(
+                          label: "Reason for Non-Compliance",
+                          labelPosition: "ADJACENT",
+                          required: true,
+                          choiceLabels: cons!CON_PC_NONCOMPLIANCE_REASONS,
+                          placeHolderLabel: cons!CON_PC_DROPDOWN,
+                          choiceValues: cons!CON_PC_NONCOMPLIANCE_REASONS,
+                          value: ri!noncomplianceReason,
+                          saveInto: ri!noncomplianceReason
+                        )
+                      },
+                      secondColumnContents: {
+                        a!textField(
+                          label: "Contractor Contact",
+                          labelPosition: "ADJACENT",
+                          readOnly: true,
+                          value: local!contractor.telMobile
+                        ),
+                        a!textField(
+                          label: "Outlet Name",
+                          labelPosition: "ADJACENT",
+                          readOnly: true,
+                          value: local!outletMaster.outletName
+                        ),
+                        a!textField(
+                          label: "Partner Name",
+                          labelPosition: "ADJACENT",
+                          readOnly: true,
+                          value: local!outletMaster.customerName
+                        )
+                      }
+                    ),
+                    a!sectionLayout(
+                      label: "Explanation of Non-Compliance",
+                      firstColumnContents: {
+                        a!paragraphField(
+                          label: "Comments",
+                          labelPosition: "ABOVE",
+                          required: true,
+                          value: ri!noncomplianceComments,
+                          saveInto: ri!noncomplianceComments
+                        )
+                      }
+                    ),
+                    if(
+                      or(
+                        rule!APN_isEmpty(
+                          local!noncomplianceDatasubset.data
+                        ),
+                        isnull(
+                          local!noncomplianceDatasubset.data.noncomplianceReason
+                        )
+                      ),
+                      {},
+                      {
+                        a!sectionLayout(
+                          label: "Non-Compliance History",
+                          firstColumnContents: {
+                            a!gridField(
+                              label: "",
+                              totalCount: local!noncomplianceDatasubset.totalCount,
+                              columns: {
+                                a!gridTextColumn(
+                                  label: "Reason for Non-Compliance",
+                                  field: "noncomplianceReason",
+                                  data: local!noncomplianceDatasubset.data.noncomplianceReason,
+                                  alignment: "LEFT"
+                                ),
+                                a!gridTextColumn(
+                                  label: "Date",
+                                  field: "createdOn",
+                                  data: datetext(
+                                    local!noncomplianceDatasubset.data.createdOn,
+                                    "dd/MM/yyyy"
+                                  ),
+                                  alignment: "LEFT"
+                                ),
+                                a!gridTextColumn(
+                                  label: "Comments",
+                                  field: "comment",
+                                  data: local!noncomplianceDatasubset.data.comment,
+                                  alignment: "LEFT"
+                                ),
+                                a!gridTextColumn(
+                                  label: "Entered By",
+                                  field: "createdBy",
+                                  data: local!noncomplianceDatasubset.data.createdBy,
+                                  alignment: "LEFT"
+                                )
+                              },
+                              value: local!noncompliancePaging,
+                              saveInto: local!noncompliancePaging
+                            )
+                          }
+                        )
+                      }
+                    ),
+                    a!buttonLayout(
+                      primaryButtons: {
+                        a!buttonWidget(
+                          label: "Submit",
+                          style: "PRIMARY",
+                          submit: true
+                        )
+                      }
+                    )
+                  },
+                  {}
+                )
+              },
+              {}
+            )
+          )
+        )
+      }
+    )
+  )
+)

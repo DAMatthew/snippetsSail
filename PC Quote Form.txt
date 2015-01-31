@@ -1,0 +1,166 @@
+= load(
+  local!outletMaster: pv!cdt_PUNCH_pubRecordOutletCustomer,
+  local!certificateType: ri!certificateType,
+  local!certificateTypeArray: ri!certificateTypeArray,
+  local!contractor: pv!cdt_PC_contractor,
+  local!itemsToken,
+  a!formLayout(
+    label: cons!CON_PC_PROCESS_NAME & ": " & pv!outletName_text & cons!CON_PC_QUOTE_FORM,
+    firstColumnContents: {
+      a!sectionLayout(
+        label: index(
+          local!certificateTypeArray.certificateTypeDesc,
+          wherecontains(
+            local!certificateType.certificateType,
+            local!certificateTypeArray.certificateType
+          )
+        ),
+        firstColumnContents: {
+          a!textField(
+            label: "Partner Name",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: local!outletMaster.customerName
+          ),
+          a!textField(
+            label: "Outlet ID",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: local!outletMaster.outletId
+          ),
+          a!textField(
+            label: "Outlet Name",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: local!outletMaster.outletName
+          ),
+          a!textField(
+            label: "Outlet Address",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: local!outletMaster.outletAddress1 & " " & local!outletMaster.outletAddress2 & ", " & local!outletMaster.outletCity & " " & local!outletMaster.outletPostCode
+          )
+        },
+        secondColumnContents: {
+          a!textField(
+            label: "Contractor Name",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: local!contractor.contractorName
+          ),
+          a!textField(
+            label: "Contractor Address",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: trim(
+              local!contractor.addressLine1 & " " & local!contractor.addressLine2 & " " & local!contractor.addressLine3 & " " & local!contractor.postCode
+            )
+          ),
+          a!textField(
+            label: "Contractor Telephone",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: local!contractor.telLandline
+          ),
+          a!textField(
+            label: "Certificate Type",
+            labelPosition: "ADJACENT",
+            readOnly: true,
+            value: local!certificateType.certificateTypeDesc
+          )
+        }
+      ),
+      a!sectionLayout(
+        label: "Schedule of Works",
+        firstColumnContents: {
+          a!gridLayout(
+            headerCells: {
+              a!gridLayoutHeaderCell(
+                label: "Item"
+              ),
+              a!gridLayoutHeaderCell(
+                label: "Description"
+              ),
+              a!gridLayoutHeaderCell(
+                label: "Cost in £"
+              ),
+              a!gridLayoutHeaderCell(
+                label: "Fixtures and Fittings"
+              ),
+              a!gridLayoutHeaderCell(
+                label: ""
+              )
+            },
+            columnConfigs: {
+              a!gridLayoutColumnConfig(
+                width: "NARROW"
+              ),
+              a!gridLayoutColumnConfig(
+                width: "DISTRIBUTE"
+              ),
+              a!gridLayoutColumnConfig(
+                width: "DISTRIBUTE"
+              ),
+              a!gridLayoutColumnConfig(
+                width: "DISTRIBUTE"
+              ),
+              a!gridLayoutColumnConfig(
+                width: "NARROW"
+              )
+            },
+            rows: a!applyComponents(
+              function: rule!er_PC_quoteFormGrid(
+                items: ri!items,
+                index: _,
+                itemsToken: local!itemsToken
+              ),
+              array: if(
+                or(
+                  isnull(
+                    ri!items
+                  ),
+                  count(
+                    ri!items
+                  ) < 1
+                ),
+                {},
+                1 + enumerate(
+                  count(
+                    ri!items
+                  )
+                )
+              ),
+              arrayVariable: local!itemsToken
+            )
+          ),
+          a!linkField(
+            label: "Add Link",
+            labelPosition: "COLLAPSED",
+            links: a!dynamicLink(
+              label: "+Add Item",
+              value: {
+                due: today() + 1
+              },
+              saveInto: {
+                ri!items << fn!append(
+                  ri!items,
+                  _
+                ),
+                local!itemsToken << fn!append(
+                  local!itemsToken,
+                  _
+                )
+              }
+            )
+          )
+        }
+      )
+    },
+    buttons: a!buttonLayout(
+      primaryButtons: a!buttonWidgetSubmit(
+        label: "Submit",
+        style: "PRIMARY"
+      )
+    )
+  )
+)

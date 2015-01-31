@@ -1,0 +1,9 @@
+tostring(apply(if(find("[",ri!userOrGroupText)=0,
+	rule!APN_displayUser(ri!userOrGroupText),
+	group(tointeger(extract(ri!userOrGroupText,":","]"))[1],"groupName")
+	),{apply(fn!trim,{split(ri!string,";")})}))
+
+	
+ri!string = text
+ri!userOrGroupText = text
+

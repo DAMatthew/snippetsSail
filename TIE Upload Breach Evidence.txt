@@ -1,0 +1,103 @@
+load(
+local!test:null,
+local!document:null,
+local!files: {  },
+local!target: tofolder(-1),
+a!formLayout(
+firstColumnContents:{
+    a!sectionLayout(
+        firstColumnContents:{
+        a!milestoneField(
+            steps:{"Site Details","Contract Breaches","Upload Evidence"},
+            active:3
+            )
+    }
+        ),
+    a!sectionLayout(
+        label:"Pictures",
+        firstColumnContents:{
+      a!applyComponents(
+        function: rule!ucMultiFileUploadRenderField(
+            label: "Upload Breach Photos", 
+            files: ri!documentArrayPhotos_Document,
+            target: index({ri!case_FolderA},5,cons!CON_TIE_BREACH_PHOTOS_FOLDER), 
+            index: _),
+            array: 1 + fn!enumerate(1 + length(ri!documentArrayPhotos_Document))
+      ),
+      if(all(contains({"png","jpg","jpeg","bmp"},_),ri!photosCheck),{},
+                a!textField(
+            label:"",
+            value:"  ",
+            validations:"Breach Photos must be uploaded as JPG, JPEG, PNG, or BMP files",
+            readOnly:true
+            )
+        ),
+            if(rule!APN_isEmpty(ri!breachPhoto.documentId),
+{},
+    a!imageField(
+     instructions:"Breach Photographs",
+    images:{
+     apply(a!documentImage(document:_), ri!breachPhoto.documentId)
+ },
+ size:"THUMBNAIL"
+)
+              ),
+                a!buttonLayout(
+        primaryButtons:{
+        a!buttonWidget(
+            label:"Save and View Photos",
+            style:"PRIMARY",
+            validate:false,
+            value:"1",
+            saveInto:ri!photoSubmitted,
+            submit:true
+            )
+    }
+        )
+           }
+           ),
+    a!sectionLayout(
+        firstColumnContents:{
+    a!textField(
+        label:"",
+        readOnly:true,
+        value:""
+        )
+           }
+           ),
+    a!buttonLayout(
+        primaryButtons:{
+        a!buttonWidgetSubmit(
+            label:"Cancel",
+            style:"NORMAL",
+			confirmMessage: "Are you sure you want to cancel?",
+            skipValidation:true,
+            value:"1",
+            saveInto:ri!cancelButton_Text
+            ),
+        a!buttonWidget(
+            label:"Next",
+            style:"PRIMARY",
+            validate:false,
+            confirmMessage:if(and(ri!breachVisitDetails.partnerSignature="Signed",isnull(ri!breachVisitReport.documentId)),
+                "ALERT: If the Partner signed the Contract Breach Form, the Contract Breach Form must be uploaded. Do you wish to continue?   -PDM Will be Notified",
+                    null),
+            value:"0",
+            saveInto:{ri!photoSubmitted,ri!goBackButton_Text},
+            submit:true
+            )
+    },
+    secondaryButtons: {
+                a!buttonWidget(
+            label:"Back",
+            style:"NORMAL",
+            submit:true,
+            value:"1",
+            saveInto:ri!goBackButton_Text
+            )
+    }
+
+        )
+}
+)
+)

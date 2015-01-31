@@ -1,0 +1,64 @@
+= a!gridRowLayout(
+  id: ri!index,
+  contents: {
+    a!textField(
+      label: "Item " & ri!index,
+      readOnly: true,
+      value: ri!index
+    ),
+    a!textField(
+      label: "Description " & ri!index,
+      align: "RIGHT",
+      value: ri!items[ri!index].descriptionOfWorks,
+      saveInto: ri!items[ri!index].descriptionOfWorks
+    ),
+    a!floatingPointField(
+      label: "Cost" & ri!index,
+      align: "RIGHT",
+      validations: if(
+        todecimal(
+          ri!items[ri!index].cost
+        ) < 1,
+        "Cost must be greater than 0",
+        null
+      ),
+      value: if(
+        rule!APN_isEmpty(
+          ri!items[ri!index].cost
+        ),
+        ri!items[ri!index].cost,
+          fixed(
+            ri!items[ri!index].cost,
+            2
+          )
+      ),
+      saveInto: ri!items[ri!index].cost
+    ),
+    a!textField(
+      label: "Fixtures and Fittings " & ri!index,
+      align: "RIGHT",
+      value: ri!items[ri!index].fixtureAndFittings,
+      saveInto: ri!items[ri!index].fixtureAndFittings
+    ),
+    a!linkField(
+      label: "delete " & ri!index,
+      align: "CENTER",
+      links: a!dynamicLink(
+        label: char(
+          10005
+        ),
+        value: ri!index,
+        saveInto: {
+          ri!items << fn!remove(
+            ri!items,
+            _
+          ),
+          ri!itemsToken << fn!remove(
+            ri!itemsToken,
+            _
+          )
+        }
+      )
+    )
+  }
+)

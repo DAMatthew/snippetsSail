@@ -1,0 +1,879 @@
+load(
+  local!docpic: finddocumentsbyname(
+    false,
+    rf!outletId,
+    cons!CON_TIE_PHOTO_FOLDER
+  ),
+  local!price: rule!qr_PUBS_getPriceBandsbyOutlet(
+    rf!outletId
+  ),
+  local!agreementTie: rule!qr_PUBS_getAgreementTieByOutlet(
+    rf!outletId,
+    "Cased"
+  ),
+  local!agreementD: rule!qr_PUBS_getAgreementTieByOutlet(
+    rf!outletId,
+    "Draught"
+  ),
+  local!machineTie: rule!qr_PUBS_getAgreementTieByOutletandProductType(
+    rf!outletId,
+    "Machines Tie"
+  ),
+  local!agreementExtra: false,
+  local!all: false,
+  local!agreement: false,
+  local!hierarchy: false,
+  local!distrib: false,
+  local!customerdet: false,
+  local!customeragree: false,
+  local!machines: false,
+  local!punchclub: false,
+  a!formLayout(
+    firstColumnContents: {
+      a!sectionLayout(
+        firstColumnContents: {
+          if(
+            rule!APN_isEmpty(
+              local!docpic
+            ),
+            a!textField(
+              readOnly: true,
+              value: "No Photo Available"
+            ),
+            {
+              a!imageField(
+                instructions: "Photo of " & tostring(
+                  rf!outletName
+                ),
+                images: {
+                  a!documentImage(
+                    document: local!docpic,
+                    altText: "Photo of a pub",
+                    caption: "Photo of " & tostring(
+                      rf!outletName
+                    )
+                  )
+                },
+                size: "STANDARD"
+              )
+            }
+          ),
+          a!linkField(
+            links: {
+              a!safeLink(
+                uri: stripwith(rule!er_TIE_pubmap(
+                    rf!outletPostCode,
+                    rf!outletName,
+                    rf!outletCity
+                  ),"'"),
+                label: "Click for map"
+              )
+            }
+          )
+        },
+        secondColumnContents: {
+          a!textField(
+            label: "Customer Name:",
+            readOnly: true(),
+            value: rf!customerName
+          ),
+          a!textField(
+            label: "Customer Number:",
+            readOnly: true(),
+            value: rf!customerId
+          ),
+          a!textField(
+            label: "Customer Address:",
+            readOnly: true(),
+            value: if(
+              rule!APN_isEmpty(
+                rf!customerAddress2
+              ),
+              rf!customerAddress1 & "
+" & rf!customerCity & ", " & rf!customerPostCode,
+              rf!customerAddress1 & "
+" & rf!customerAddress2 & "
+" & rf!customerCity & ", " & rf!customerPostCode
+            )
+          ),
+          a!textField(
+            label: "Customer Tel:",
+            readOnly: true(),
+            value: rf!customerTelephone
+          ),
+          a!textField(
+            label: "",
+            readOnly: true(),
+            value: ""
+          ),
+          a!textField(
+            label: "Trade Type:",
+            readOnly: true(),
+            value: rf!tradeType
+          ),
+          a!textField(
+            label: "Trade Co:",
+            readOnly: true(),
+            value: rf!tradingCompany
+          ),
+          a!textField(
+            label: "Segment:",
+            readOnly: true(),
+            value: rf!segment
+          ),
+          a!textField(
+            label: "Agreement Type:",
+            readOnly: true(),
+            value: rf!agreementType
+          ),
+          a!textField(
+            label: "Multiple Operator:",
+            readOnly: true(),
+            value: rf!multipleCode
+          )
+        }
+      ),
+      a!sectionLayout(
+        label: "Contract Compliance Dashboard",
+        firstColumnContents: {
+          a!linkField(
+            label: "",
+            links: a!recordLink(
+              recordType: cons!CONS_TIE_TIE_RECORD,
+              identifier: rf!outletId,
+              label: "Click for Contract Compliance Dashboard"
+            )
+          )
+        }
+      ),
+      a!sectionLayout(
+        label: "KPIs",
+        firstColumnContents: {
+          a!textField(
+            label: "Beer Vol MAT:",
+            instructions: "(Current Year)",
+            readOnly: true(),
+            value: ""
+          ),
+          a!textField(
+            label: "Line Cleaning",
+            readOnly: true(),
+            value: ""
+          )
+        },
+        secondColumnContents: {
+          a!textField(
+            label: "Beer Vol MAT:",
+            instructions: "(Last Year)",
+            readOnly: true(),
+            value: ""
+          ),
+          a!textField(
+            label: "Packaged to Draught %",
+            readOnly: true(),
+            value: ""
+          )
+        }
+      ),
+      if(
+        local!all = false,
+        a!sectionLayout(
+          label: "Show All Sections",
+          firstColumnContents: {
+            a!linkField(
+              links: {
+                a!dynamicLink(
+                  label: "▼",
+                  value: true,
+                  saveInto: {
+                    local!all,
+                    local!agreement,
+                    local!hierarchy,
+                    local!distrib,
+                    local!customerdet,
+                    local!customeragree,
+                    local!machines,
+                    local!punchclub
+                  }
+                )
+              }
+            )
+          }
+        ),
+        a!sectionLayout(
+          label: "Hide All Sections",
+          firstColumnContents: {
+            a!linkField(
+              links: {
+                a!dynamicLink(
+                  label: "▲",
+                  value: false,
+                  saveInto: {
+                    local!all,
+                    local!agreement,
+                    local!hierarchy,
+                    local!distrib,
+                    local!customerdet,
+                    local!customeragree,
+                    local!machines,
+                    local!punchclub
+                  }
+                )
+              }
+            )
+          }
+        )
+      ),
+      if(
+        local!agreement = false,
+        {
+          a!sectionLayout(
+            label: "Agreement Summary",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▼",
+                    value: true,
+                    saveInto: {local!agreement}
+                  )
+                }
+              )
+            }
+          )
+        },
+        /*This next snippet displays fields if the local! is set to true */{
+          a!sectionLayout(
+            label: "Agreement Summary",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▲",
+                    value: false,
+                    saveInto: {local!agreement}
+                  )
+                }
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              rule!er_PUBS_autoGrid(
+                 gridTitle: "Agreement",
+                gridLabels: { 
+            "Agreement No.",
+                      "Start Date",
+                      "End Date",
+                      "Term",
+                      "Type",
+                      "Net Rent",
+                      "Concession?",
+                      "Discount Scheme?"
+                    },
+                  gridData: {
+                      rf!agreementNo,
+            todate(rf!agreementStartDate),
+                      todate(rf!agreementEndDate),
+                      rf!agreementTerm&" "&"years",
+                      rf!agreementType,
+                      "£"&rf!rentReceivable,
+            if(rf!rentConcessionValue=0,"N","Y"),
+                      "WAITING FOR FURTHER INFO"
+                    }
+                  )
+                },
+            secondColumnContents: {
+              a!gridField(
+                label: "Price Bands",
+                totalCount: if(rule!APN_isEmpty(index(local!price,"priceBand")),2,count(index(local!price,"priceBand"))),
+                columns: {
+                  a!gridTextColumn(
+                  label: "Category",
+                    data: {index(local!price, "pricebandCategory")},
+                    alignment: "LEFT"
+                  ),
+                  a!gridTextColumn(
+                  label: "Band",
+                  data: {index(local!price,"priceBand")},
+                  alignment: "LEFT"
+                  )
+                },
+                disabled: true,
+                value: a!pagingInfo(
+                  startIndex: 1,
+                  batchSize: if(rule!APN_isEmpty(index(local!price,"priceBand")),2,count(index(local!price,"priceBand")))
+                )
+              )
+                    }
+                  ),
+          a!sectionLayout(
+            firstColumnContents: {
+               a!gridField(
+                label: "Ties",
+                totalCount: if(rule!APN_isEmpty(index(local!agreementD,"tiedFlag")),3,count(index(local!agreementD,"tiedFlag"))),
+                  columns: {
+                   a!gridTextColumn(
+                    label: "Category",
+                    data: {index(local!agreementD,"productType")},
+                    alignment: "LEFT"
+                    ),
+                   a!gridTextColumn(
+                    label: "Cased",
+                    data: {index(local!agreementTie,"tiedFlag")},
+                    alignment: "LEFT"
+                    ),
+                   a!gridTextColumn(
+                    label: "Draught",
+                    data: {index(local!agreementD,"tiedFlag")},
+                    alignment: "LEFT"
+                    )
+                 },
+                 disabled: true,
+                 value: a!pagingInfo(
+                  startIndex: 1,
+                  batchsize: if(rule!APN_isEmpty(index(local!agreementD,"tiedFlag")),3,count(index(local!agreementD,"tiedFlag")))
+                 ) 
+                ),
+              if(
+                local!agreementExtra = false,
+                a!linkField(
+                  links: {
+                    a!dynamicLink(
+                      label: "Agreement Details",
+                      value: true,
+                      saveInto: {local!agreementExtra}
+                    )
+                  }
+                ),
+                a!linkField(
+                  links: {
+                    a!dynamicLink(
+                      label: "Hide Agreement Details",
+                      value: false,
+                      saveInto: {local!agreementExtra}
+                    )
+                  }
+                )
+              )
+            }
+          ),
+          if(
+            local!agreementExtra = false,
+            {},
+            {
+              a!sectionLayout(
+                firstColumnContents: {
+                  rule!er_PUBS_autoGrid(
+                    gridTitle: "Rent & Concessions",
+                    gridLabels: {
+                      "Gross Rent",
+                      "RPI Linked",
+                      "Billing Frequency",
+                      "Review Date",
+                      "Concession",
+                      "Start Date",
+                      "End Date",
+                      "Code",
+                      "Reason"
+                    },
+                    gridData: {
+                      "£"&rf!rentReceivable,
+                      rf!rpi,
+                      rf!rentFrequency,
+                      rf!rentReviewDate,
+                      rf!rentConcessionValue,
+                      todate(rf!rentConcessionStartDate),
+                      todate(rf!rentConcessionEndDate),
+                      rf!rentConcessionCode,
+                      rf!rentConcessionReason
+                    }
+                  )
+                }
+              )
+            }
+          )
+        }/* End of an array of sections*/
+      ),
+      if(
+        local!hierarchy = false,
+        {
+          a!sectionLayout(
+            label: "Company Hierarchy",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▼",
+                    value: true,
+                    saveInto: {
+                      local!hierarchy
+                    }
+                  )
+                }
+              )
+            }
+          )
+        },
+        /*This next snippet displays fields if the local! is set to true */{
+          a!sectionLayout(
+            label: "Company Hierarchy",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▲",
+                    value: false,
+                    saveInto: {
+                      local!hierarchy
+                    }
+                  )
+                }
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              a!gridField(
+                label: "Operational Structure",
+                totalCount: 1,
+                columns: {
+                  a!gridTextColumn(
+                    label: "Division",
+                    data: {
+                      rf!regionCode
+                    },
+                    alignment: "LEFT"
+                  ),
+                  a!gridTextColumn(
+                    label: "Region",
+                    data: {
+                      rf!territoryCode
+                    },
+                    alignment: "LEFT"
+                  ),
+                  a!gridTextColumn(
+                    label: "Area",
+                    data: {
+                      rf!areaCode
+                    },
+                    alignment: "LEFT"
+                  )
+                },
+                disabled: true,
+                value: a!pagingInfo(
+                  startIndex: 1,
+                  batchSize: 1
+                )
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Operations Contacts",
+                gridLabels: {
+                  "OD",
+                  "ROD",
+                  "PDM",
+                  "TSR",
+                  "RVS"
+                },
+                gridData: {
+                  rf!omName,
+                  rf!rod,
+                  rf!brm,
+                  rf!tsr,
+                  rf!rvsName
+                }
+              ),
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Other Contacts",
+                gridLabels: {
+                  "RAM",
+                  "Property Mgr",
+                  "Selection Co.",
+                  "Catering Dev Mgr",
+                  "Credit Mgr",
+                  "Credit Assistant"
+                },
+                gridData: {
+                  rf!ram,
+                  rf!propertyManager,
+                  rf!selectionCoordinator,
+                  rf!machineManager,
+                  rf!creditManager,
+                  rf!creditAssistant
+                }
+              )
+            },
+            secondColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "NBM Contacts",
+                gridLabels: {
+                  "NBM OD",
+                  "NDM ROD",
+                  "NBM"
+                },
+                gridData: {
+                  rf!nbmOd,
+                  rf!nbmRod,
+                  rf!nbm
+                }
+              )
+            }
+          )
+        }/* End of an array of sections*/
+      ),
+      if(
+        local!distrib = false,
+        {
+          a!sectionLayout(
+            label: "Distribution, Dispense, Monitoring & Acquisition",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▼",
+                    value: true,
+                    saveInto: {
+                      local!distrib
+                    }
+                  )
+                }
+              )
+            }
+          )
+        },
+        /*This next snippet displays fields if the local! is set to true */{
+          a!sectionLayout(
+            label: "Distribution, Dispense, Monitoring & Acquisition",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▲",
+                    value: false,
+                    saveInto: {
+                      local!distrib
+                    }
+                  )
+                }
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Distribution",
+                gridLabels: {
+                  "Depot",
+                  "Delivery Day",
+                  "Delivery Window"
+                },
+                gridData: {
+                  rf!depot,
+                  rf!deliveryDay,
+                  rf!deliveryWindow
+                }
+              ),
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Acquisition",
+                gridLabels: {
+                  "Group",
+                  "Date",
+                  "Tenure",
+                  "Licensing Authority"
+                },
+                gridData: {
+                  rf!acquisitionGroup,
+                  todate(rf!acquisitionDate),
+                  rf!tenure,
+                  rf!LicAuth
+                }
+              )
+            },
+            secondColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Dispense Monitoring",
+                gridLabels: {
+                  "EDIS No.",
+                  "Installed Date",
+                  "Supplies",
+                  "Cut Off Time",
+                  "24Hr Dels?"
+                },
+                gridData: {
+                  rf!dispenseMonitoringEdisNo,
+                  todate(rf!dispenseMonitoringInstallDate),
+                  rf!dispenseMonitoringSupplier,
+                  totime(rf!cutOffTime),
+                  rf!nextDayDel
+                }
+              )
+            }
+          )
+        }/* End of an array of sections*/
+      ),
+      if(
+        local!customerdet = false,
+        {
+          a!sectionLayout(
+            label: "Customer Detail",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▼",
+                    value: true,
+                    saveInto: {
+                      local!customerdet
+                    }
+                  )
+                }
+              )
+            }
+          )
+        },
+        /*This next snippet displays fields if the local! is set to true */{
+          a!sectionLayout(
+            label: "Customer Detail",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▲",
+                    value: false,
+                    saveInto: {
+                      local!customerdet
+                    }
+                  )
+                }
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Miscellaneous",
+                gridLabels: {
+                  "Call Day",
+                  "Principal Brewer",
+                  "Finest Cask"
+                },
+                gridData: {
+                  rf!callDay,
+                  rf!principalBrewer,
+                  rf!finestCask
+                }
+              ),
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Payments",
+                gridLabels: {
+                  "Terms",
+                  "Instrument",
+                  "Litigation"
+                },
+                gridData: {
+                  rf!paymentTerms & " - " & rf!paymentTermsCode,
+                  rf!paymentInstrument,
+                  rf!litigation
+                }
+              )
+            },
+            secondColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Identification",
+                gridLabels: {
+                  "Formal Name",
+                  "Informal Name"
+                },
+                gridData: {
+                  rf!customerNameFormal,
+                  rf!customerNameInformal
+                }
+              ),
+              rule!er_PUBS_autoGrid(
+                gridTitle: "F&F",
+                gridLabels: {
+                  "F&F ID",
+                  "F&F Ownership"
+                },
+                gridData: {
+                  rf!fandFCustomerId,
+                  rf!fandFOwnership
+                }
+              )
+            }
+          )
+        }/* End of an array of sections*/
+      ),
+      if(
+        local!machines = false,
+        {
+          a!sectionLayout(
+            label: "Machines",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▼",
+                    value: true,
+                    saveInto: {
+                      local!machines
+                    }
+                  )
+                }
+              )
+            }
+          )
+        },
+        /*This next snippet displays fields if the local! is set to true */{
+          a!sectionLayout(
+            label: "Machines",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▲",
+                    value: false,
+                    saveInto: {
+                      local!machines
+                    }
+                  )
+                }
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Details",
+                gridLabels: {
+                  "Terms"
+                },
+                gridData: {
+                  rf!machineTerms
+                }
+              )
+            },
+            secondColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Ties",
+                gridLabels: {
+                  "AWP",
+                  "SWP",
+                  "Pool",
+                  "Other"
+                },
+                gridData: {
+                  index(
+                    local!machineTie.tiedFlag,
+                    wherecontains(
+                      local!machineTie.packForm,
+                      "Amusement With Prizes"
+                    ),
+                    {}
+                  ),
+                  index(
+                    local!machineTie.tiedFlag,
+                    wherecontains(
+                      local!machineTie.packForm,
+                      "Skills With Prizes"
+                    ),
+                    {}
+                  ),
+                  index(
+                    local!machineTie.tiedFlag,
+                    wherecontains(
+                      local!machineTie.packForm,
+                      "Pool"
+                    ),
+                    {}
+                  ),
+                  index(
+                    local!machineTie.tiedFlag,
+                    wherecontains(
+                      local!machineTie.packForm,
+                      "Other Machines"
+                    ),
+                    {}
+                  )
+                }
+              )
+            }
+          )
+        }/* End of an array of sections*/
+      ),
+      if(
+        local!punchclub = false,
+        {
+          a!sectionLayout(
+            label: "Punch Buying Club Details",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▼",
+                    value: true,
+                    saveInto: {
+                      local!punchclub
+                    }
+                  )
+                }
+              )
+            }
+          )
+        },
+        /*This next snippet displays fields if the local! is set to true */{
+          a!sectionLayout(
+            label: "Punch Buying Club Details",
+            firstColumnContents: {
+              a!linkField(
+                links: {
+                  a!dynamicLink(
+                    label: "▲",
+                    value: false,
+                    saveInto: {
+                      local!punchclub
+                    }
+                  )
+                }
+              )
+            }
+          ),
+          a!sectionLayout(
+            firstColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Details",
+                gridLabels: {
+                  "PBC?",
+                  "Paperless Invoicing?"
+                },
+                gridData: {
+                  rf!pbc,
+                  rf!paperlessInvoicing
+                }
+              )
+            },
+            secondColumnContents: {
+              rule!er_PUBS_autoGrid(
+                gridTitle: "Ties",
+                gridLabels: {
+                  "Goods Print Indicator",
+                  "Rent Print Indicator",
+                  "Statements Print Indicator"
+                },
+                gridData: {
+                  rf!goodsPrintIndicator,
+                  rf!rentPrintIndicator,
+                  rf!statementsPrintIndicator
+                }
+              )
+            }
+          )
+        }/* End of an array of sections*/
+      )
+    }
+  )
+)
